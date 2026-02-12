@@ -1,0 +1,56 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# Virtual environment
+venv/
+.venv/
+
+# Environment variables
+.env
+
+# Database
+*.db
+*.sqlite3
+
+# Logs
+logs/
+*.log
+
+# Temp uploads & audit reports
+backend/temp_uploads/
+backend/audit_reports/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+NUL
+
+# Testing
+.pytest_cache/
+htmlcov/
+.coverage
+test_trustguard.db
+
+# Model weights (large files)
+backend/models/*.pth
+backend/models/*.h5
+
+# Frontend
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+
+# Misc
+datasets/
+Golden_Vulnerability_Final.pptx
+TrustDesign.pdf
+files*/
