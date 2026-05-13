@@ -195,16 +195,22 @@ class BehaviorAnalyzer:
         We measure path "efficiency" — actual distance vs straight-line distance.
         Ratio close to 1.0 = perfectly straight = bot-like.
         Ratio > 1.2 = curved/natural = human.
+
+        Trackpad users and short movements naturally produce straighter paths,
+        so we analyze multiple segments instead of just start-to-end.
         """
         if len(movements) < 3:
             return 0.5
 
         # Calculate actual path length
         actual_length = 0
+        segment_lengths = []
         for i in range(1, len(movements)):
             dx = movements[i]["x"] - movements[i - 1]["x"]
             dy = movements[i]["y"] - movements[i - 1]["y"]
-            actual_length += np.sqrt(dx ** 2 + dy ** 2)
+            seg = np.sqrt(dx ** 2 + dy ** 2)
+            actual_length += seg
+            segment_lengths.append(seg)
 
         # Straight-line distance (start to end)
         dx_total = movements[-1]["x"] - movements[0]["x"]
@@ -214,15 +220,42 @@ class BehaviorAnalyzer:
         if straight_length < 1:
             return 0.7  # Mouse barely moved — inconclusive
 
+        # For short distances (< 200px), trackpad users move straighter — don't penalize
+        if straight_length < 200:
+            ratio = actual_length / straight_length
+            if ratio < 1.01:
+                return 0.4   # Still suspicious if PERFECTLY straight on short distance
+            else:
+                return 0.8   # Short distance with any wobble = fine
+
         # Path efficiency ratio
         ratio = actual_length / straight_length
 
-        if ratio < 1.02:
-            return 0.2   # Almost perfectly straight — bot
-        elif ratio < 1.10:
-            return 0.5   # Very straight — suspicious
+        # Also check direction changes — humans change direction, bots don't
+        direction_changes = 0
+        for i in range(2, len(movements)):
+            dx1 = movements[i - 1]["x"] - movements[i - 2]["x"]
+            dy1 = movements[i - 1]["y"] - movements[i - 2]["y"]
+            dx2 = movements[i]["x"] - movements[i - 1]["x"]
+            dy2 = movements[i]["y"] - movements[i - 1]["y"]
+            # Cross product sign change = direction change
+            cross = dx1 * dy2 - dy1 * dx2
+            if i > 2:
+                prev_dx1 = movements[i - 2]["x"] - movements[i - 3]["x"]
+                prev_dy1 = movements[i - 2]["y"] - movements[i - 3]["y"]
+                prev_cross = prev_dx1 * dy1 - prev_dy1 * dx1
+                if cross * prev_cross < 0:
+                    direction_changes += 1
+
+        dir_ratio = direction_changes / max(1, len(movements) - 2)
+
+        # Combine path ratio and direction changes
+        if ratio < 1.02 and dir_ratio < 0.05:
+            return 0.2   # Almost perfectly straight with no direction changes — bot
+        elif ratio < 1.05:
+            return 0.4 + dir_ratio * 3  # Straight but some direction changes = less suspicious
         elif ratio < 2.0:
-            return 0.9   # Natural wobble — human
+            return 0.85 + min(0.1, dir_ratio)  # Natural wobble — human
         else:
             return 0.7   # Very wobbly — still human (shaky hand)
 

@@ -129,8 +129,16 @@ class VoiceDetector:
             # Check 3: Energy Variation
             energy_score = self._check_energy_variation(audio_data)
 
-            # Weighted average — all three contribute equally
-            human_score = (flatness_score + zcr_score + energy_score) / 3.0
+            # Check 4: Pitch Variation — human speech has changing pitch, synthetic is monotone
+            pitch_score = self._check_pitch_variation(audio_data, sample_rate)
+
+            # Weighted: spectral and pitch matter most for voice detection
+            human_score = (
+                0.30 * flatness_score
+                + 0.20 * zcr_score
+                + 0.20 * energy_score
+                + 0.30 * pitch_score
+            )
             synthetic_score = 1.0 - human_score
 
             is_synthetic = synthetic_score > 0.5
@@ -163,6 +171,8 @@ class VoiceDetector:
         Real speech: lower flatness (has clear peaks at vocal frequencies).
         Synthetic: higher flatness (more uniform spectrum).
         Score closer to 1.0 = more human-like.
+
+        Uses gradual scoring instead of hard buckets for better accuracy.
         """
         spectrum = np.abs(np.fft.rfft(audio))
         spectrum = spectrum[spectrum > 0]  # Remove zeros for log
@@ -175,16 +185,18 @@ class VoiceDetector:
 
         flatness = geo_mean / (arith_mean + 1e-10)
 
-        # Real speech: flatness ~0.01-0.3. Synthetic: ~0.3-0.8
-        # Lower flatness = more human-like
-        if flatness < 0.15:
-            return 0.9  # Very human-like
-        elif flatness < 0.35:
-            return 0.7  # Probably human
-        elif flatness < 0.55:
-            return 0.4  # Uncertain
+        # Gradual curve: real speech flatness ~0.01-0.25, synthetic ~0.3-0.8
+        # Browser-recorded 16kHz audio with ambient noise tends toward 0.1-0.3
+        if flatness < 0.05:
+            return 0.95
+        elif flatness < 0.25:
+            return 0.95 - (flatness - 0.05) / 0.20 * 0.25  # 0.95 → 0.70
+        elif flatness < 0.40:
+            return 0.70 - (flatness - 0.25) / 0.15 * 0.30  # 0.70 → 0.40
+        elif flatness < 0.60:
+            return 0.40 - (flatness - 0.40) / 0.20 * 0.15  # 0.40 → 0.25
         else:
-            return 0.2  # Likely synthetic
+            return max(0.1, 0.25 - (flatness - 0.60) * 0.5)
 
     def _check_zero_crossing_rate(self, audio: np.ndarray) -> float:
         """
@@ -192,7 +204,6 @@ class VoiceDetector:
         Human speech: moderate ZCR with high variance (vowels low, consonants high).
         Synthetic: more uniform ZCR.
         """
-        # Split into small chunks and measure ZCR variance
         chunk_size = 1024
         chunks = [audio[i:i + chunk_size] for i in range(0, len(audio) - chunk_size, chunk_size)]
 
@@ -206,15 +217,16 @@ class VoiceDetector:
 
         zcr_variance = np.var(zcrs)
 
-        # Human speech has high variance in ZCR (quiet parts vs loud parts)
-        if zcr_variance > 0.01:
-            return 0.9  # High variance = natural
+        # Gradual curve: human speech ZCR variance typically 0.002-0.05+
+        # Browser microphone adds ambient noise which increases variance (good for human detection)
+        if zcr_variance > 0.015:
+            return 0.95
         elif zcr_variance > 0.005:
-            return 0.7
+            return 0.70 + (zcr_variance - 0.005) / 0.010 * 0.25  # 0.70 → 0.95
         elif zcr_variance > 0.001:
-            return 0.4
+            return 0.45 + (zcr_variance - 0.001) / 0.004 * 0.25  # 0.45 → 0.70
         else:
-            return 0.2  # Too uniform = synthetic
+            return max(0.15, zcr_variance / 0.001 * 0.45)
 
     def _check_energy_variation(self, audio: np.ndarray) -> float:
         """
@@ -234,14 +246,73 @@ class VoiceDetector:
         # Coefficient of variation — how much energy varies relative to its mean
         cv = energy_std / energy_mean
 
-        if cv > 1.5:
-            return 0.9  # High variation = natural speech
-        elif cv > 0.8:
-            return 0.7
-        elif cv > 0.3:
-            return 0.4
+        # Gradual curve: human speech CV typically 0.5-3.0+
+        # Short browser recordings (3-10s) have slightly less variation
+        if cv > 2.0:
+            return 0.95
+        elif cv > 1.0:
+            return 0.75 + (cv - 1.0) / 1.0 * 0.20  # 0.75 → 0.95
+        elif cv > 0.4:
+            return 0.50 + (cv - 0.4) / 0.6 * 0.25   # 0.50 → 0.75
+        elif cv > 0.1:
+            return 0.25 + (cv - 0.1) / 0.3 * 0.25   # 0.25 → 0.50
         else:
-            return 0.2  # Too uniform = synthetic
+            return max(0.1, cv / 0.1 * 0.25)
+
+    def _check_pitch_variation(self, audio: np.ndarray, sample_rate: int) -> float:
+        """
+        Pitch variation — human speech naturally changes pitch (intonation).
+        Synthetic/TTS audio tends to be more monotone or have unnatural pitch jumps.
+
+        Uses autocorrelation to estimate fundamental frequency (F0) per chunk.
+        Human F0: 85-300 Hz, with gradual variation across chunks.
+        """
+        chunk_size = int(sample_rate * 0.03)  # 30ms chunks
+        hop = chunk_size // 2  # 50% overlap
+        min_lag = int(sample_rate / 300)  # Max F0 = 300 Hz
+        max_lag = int(sample_rate / 85)   # Min F0 = 85 Hz
+
+        if max_lag >= chunk_size or len(audio) < chunk_size * 4:
+            return 0.5  # Not enough data
+
+        pitches = []
+        for start in range(0, len(audio) - chunk_size, hop):
+            chunk = audio[start:start + chunk_size]
+            # Skip silent chunks
+            if np.max(np.abs(chunk)) < 0.02:
+                continue
+
+            # Autocorrelation to find pitch
+            corr = np.correlate(chunk, chunk, mode='full')
+            corr = corr[len(corr) // 2:]  # Take positive lags only
+
+            # Look for peak in the speech frequency range
+            search_region = corr[min_lag:max_lag] if max_lag <= len(corr) else corr[min_lag:]
+            if len(search_region) == 0:
+                continue
+
+            peak_idx = np.argmax(search_region) + min_lag
+            if corr[peak_idx] > 0.3 * corr[0]:  # Confidence threshold
+                f0 = sample_rate / peak_idx
+                if 85 <= f0 <= 300:
+                    pitches.append(f0)
+
+        if len(pitches) < 3:
+            return 0.5  # Not enough voiced frames
+
+        pitch_std = np.std(pitches)
+        pitch_mean = np.mean(pitches)
+
+        # Human speech: pitch std typically 10-60 Hz (natural intonation)
+        # Monotone synth: pitch std < 5 Hz
+        # Glitchy synth: pitch std > 80 Hz (unnatural jumps)
+        if 8 <= pitch_std <= 70:
+            # Natural range — score based on how centered it is
+            return min(0.95, 0.70 + (min(pitch_std, 40) - 8) / 32 * 0.25)
+        elif pitch_std < 8:
+            return max(0.2, pitch_std / 8 * 0.65)  # Too monotone
+        else:
+            return max(0.3, 0.95 - (pitch_std - 70) / 50 * 0.4)  # Too jumpy
 
     def _get_risk_level(self, synthetic_score: float) -> str:
         """Map synthetic score to risk level (same pattern as deepfake/liveness)."""

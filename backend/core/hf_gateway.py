@@ -61,7 +61,7 @@ class HFGateway:
 
             except Exception as e:
                 wait = (attempt + 1) * 2  # 2s, 4s, 6s backoff
-                logger.warning("HF call failed (attempt {}/{}): {} — retrying in {}s", attempt + 1, max_retries, e, wait)
+                logger.warning("HF call failed (attempt {}/{}): retrying in {}s", attempt + 1, max_retries, wait)
                 if attempt < max_retries - 1:
                     time.sleep(wait)
 
@@ -91,7 +91,7 @@ class HFGateway:
 
             except Exception as e:
                 wait = (attempt + 1) * 2
-                logger.warning("HF call failed (attempt {}/{}): {} — retrying in {}s", attempt + 1, max_retries, e, wait)
+                logger.warning("HF call failed (attempt {}/{}): retrying in {}s", attempt + 1, max_retries, wait)
                 if attempt < max_retries - 1:
                     time.sleep(wait)
 

@@ -19,7 +19,7 @@ from loguru import logger
 class QualityGateChecker:
     """Enforces validation rules before finalizing a verification decision."""
 
-    def __init__(self, max_hashes: int = 1000):
+    def __init__(self, max_hashes: int = 10000):
         # LRU-style hash cache — stores recent file hashes to detect replays
         self._recent_hashes = OrderedDict()
         self._max_hashes = max_hashes
@@ -101,8 +101,8 @@ class QualityGateChecker:
         risk_order = {"LOW": 0, "MEDIUM": 1, "HIGH": 2, "CRITICAL": 3}
         risk_values = [risk_order.get(r, 1) for r in risk_levels]
 
-        # Flag if the gap between min and max risk is >= 3 (e.g., LOW vs CRITICAL)
-        return (max(risk_values) - min(risk_values)) < 3
+        # Flag if the gap between min and max risk is >= 2 (e.g., LOW vs HIGH)
+        return (max(risk_values) - min(risk_values)) < 2
 
     @staticmethod
     def compute_file_hash(file_path: str) -> str:

@@ -11,10 +11,10 @@ if sys.platform == "win32" and hasattr(sys.stdout, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
+from starlette.middleware.base import BaseHTTPMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 import uvicorn
@@ -37,6 +37,23 @@ from backend.utils.rate_limiter import limiter
 
 # Import routers
 from backend.api import routes_general, routes_deepfake, routes_liveness, routes_voice, routes_behavior, routes_session, routes_audit, routes_kyc, routes_auth, routes_user, routes_analytics
+
+
+# ── Security Headers Middleware ─────────────────────────────────
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Adds security headers to every response."""
+    async def dispatch(self, request: Request, call_next):
+        response: Response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        if not config.DEBUG:
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        # Prevent caching of authenticated responses
+        if "authorization" in {k.lower() for k in request.headers.keys()}:
+            response.headers["Cache-Control"] = "no-store"
+        return response
 
 
 @asynccontextmanager
@@ -106,7 +123,14 @@ async def lifespan(app):
     logger.info("KYC pipeline ready")
 
     logger.info("TrustGuard API ready! Docs at http://{}:{}/docs", config.API_HOST, config.API_PORT)
-    yield
+
+    try:
+        yield
+    finally:
+        # Cleanup: dispose database engine to release connections
+        logger.info("Shutting down — disposing database engine...")
+        engine.dispose()
+        logger.info("Database engine disposed")
 
 
 # Tag metadata — controls how endpoint groups appear in Swagger UI
@@ -157,7 +181,7 @@ tags_metadata = [
     },
 ]
 
-# Create FastAPI app
+# Create FastAPI app — disable docs in production
 app = FastAPI(
     title="TrustGuard",
     description="""
@@ -187,21 +211,25 @@ Detection endpoints are rate-limited per IP (10/min for images, 5/min for video,
     version=config.APP_VERSION,
     lifespan=lifespan,
     openapi_tags=tags_metadata,
-    docs_url="/docs",
-    redoc_url="/redoc",
+    docs_url="/docs" if config.DEBUG else None,
+    redoc_url="/redoc" if config.DEBUG else None,
+    openapi_url="/openapi.json" if config.DEBUG else None,
 )
+
+# Security headers
+app.add_middleware(SecurityHeadersMiddleware)
 
 # Rate limiting — prevents API abuse (e.g., 10 requests/minute per IP)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# CORS — allow frontend to connect
+# CORS — explicit method and header whitelist
 app.add_middleware(
     CORSMiddleware,
     allow_origins=config.CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "Accept"],
 )
 
 # Register all route groups

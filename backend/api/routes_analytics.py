@@ -14,14 +14,15 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
+from backend.api.routes_user import get_current_user
 from backend.database.session import get_db
-from backend.database.models import VerificationLog
+from backend.database.models import User, VerificationLog
 
 router = APIRouter(prefix="/api/v1/analytics", tags=["Analytics"])
 
 
 @router.get("/summary")
-async def get_summary(db: Session = Depends(get_db)):
+async def get_summary(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """
     Overall platform stats — total scans, deepfakes caught, average confidence, etc.
 
@@ -70,6 +71,7 @@ async def get_summary(db: Session = Depends(get_db)):
 async def get_recent(
     limit: int = Query(default=20, le=100, ge=1),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Most recent verification results — like an activity feed.

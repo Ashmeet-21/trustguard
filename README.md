@@ -3,7 +3,7 @@
 ![Python 3.11](https://img.shields.io/badge/Python-3.11-blue)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.128-green)
 ![Next.js 16](https://img.shields.io/badge/Next.js-16-black)
-![Tests](https://img.shields.io/badge/Tests-88%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/Tests-90%20passing-brightgreen)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
 
 A full-stack identity verification platform that combines **4 AI detection agents** — deepfake detection, liveness checking, voice analysis, and behavioral biometrics — into a single trust score through an orchestrated pipeline with quality gates and audit trails.
@@ -105,8 +105,12 @@ Agent Scores ──► Weighted Average ──► Trust Score (0-100) ──► 
 
 | Method | Endpoint | Description | Auth | Rate Limit |
 |--------|----------|-------------|------|------------|
-| `POST` | `/api/v1/session/create` | Create verification session | — | — |
-| `POST` | `/api/v1/session/{id}/verify` | Run multi-agent verification | — | 5/min |
+| `POST` | `/api/v1/auth/register` | Create account | — | 5/min |
+| `POST` | `/api/v1/auth/login` | Get JWT token | — | 5/min |
+| `GET` | `/api/v1/user/me` | User profile | JWT | — |
+| `GET` | `/api/v1/user/me/history` | Verification history | JWT | — |
+| `POST` | `/api/v1/session/create` | Create verification session | Optional | 10/min |
+| `POST` | `/api/v1/session/{id}/verify` | Run multi-agent verification | Optional | 5/min |
 | `GET` | `/api/v1/session/{id}` | Get session state | — | — |
 | `POST` | `/api/v1/detect/deepfake/image` | Deepfake check (image) | — | 10/min |
 | `POST` | `/api/v1/detect/deepfake/video` | Deepfake check (video) | — | 5/min |
@@ -117,15 +121,13 @@ Agent Scores ──► Weighted Average ──► Trust Score (0-100) ──► 
 | `POST` | `/api/v1/detect/voice/batch` | Batch voice analysis | — | 3/min |
 | `POST` | `/api/v1/detect/behavior` | Behavioral biometrics | — | 10/min |
 | `POST` | `/api/v1/verify/kyc` | Full KYC pipeline | — | 5/min |
-| `GET` | `/api/v1/audit/{session_id}` | Get audit report | — | — |
-| `GET` | `/api/v1/audit/` | Recent audit reports | — | — |
-| `GET` | `/api/v1/analytics/summary` | Platform statistics | — | — |
-| `GET` | `/api/v1/analytics/recent` | Recent verifications | — | — |
-| `POST` | `/api/v1/auth/register` | Create account | — | — |
-| `POST` | `/api/v1/auth/login` | Get JWT token | — | — |
-| `GET` | `/api/v1/user/me` | User profile | JWT | — |
-| `GET` | `/api/v1/user/me/history` | Verification history | JWT | — |
+| `GET` | `/api/v1/audit/{session_id}` | Get audit report | JWT | — |
+| `GET` | `/api/v1/audit/` | Recent audit reports | JWT | — |
+| `GET` | `/api/v1/analytics/summary` | Platform statistics | JWT | — |
+| `GET` | `/api/v1/analytics/recent` | Recent verifications | JWT | — |
 | `GET` | `/health` | Health check + model status | — | — |
+
+> **Auth levels**: **JWT** = requires `Authorization: Bearer <token>` header. **Optional** = works without auth, but links results to user account when authenticated. **—** = public, no auth needed.
 
 Interactive docs at **http://localhost:8000/docs** when the server is running.
 
@@ -179,7 +181,7 @@ Runs both backend (port 8000) and frontend (port 3000).
 ## Running Tests
 
 ```bash
-# All 88 tests
+# All 90 tests
 pytest tests/ -v
 
 # By module
@@ -282,8 +284,9 @@ trustguard/
 │   ├── src/
 │   │   ├── app/
 │   │   │   ├── page.tsx              # Landing page
-│   │   │   ├── verify/page.tsx       # 5-step verification wizard
-│   │   │   └── dashboard/page.tsx    # Analytics dashboard
+│   │   │   ├── login/page.tsx        # Login & register page
+│   │   │   ├── verify/page.tsx       # 5-step verification wizard (auth required)
+│   │   │   └── dashboard/page.tsx    # Analytics dashboard (auth required)
 │   │   ├── components/
 │   │   │   ├── CameraCapture.tsx     # Webcam + file upload
 │   │   │   ├── AudioRecorder.tsx     # Voice recording
@@ -291,9 +294,11 @@ trustguard/
 │   │   │   ├── TrustScoreGauge.tsx   # Circular score visualization
 │   │   │   ├── AgentStatusCard.tsx   # Per-agent result cards
 │   │   │   ├── StepWizard.tsx        # Step progress indicator
-│   │   │   └── Navbar.tsx            # Navigation bar
+│   │   │   └── Navbar.tsx            # Navigation bar (auth-aware)
 │   │   └── lib/
-│   │       └── api.ts                # API client (typed)
+│   │       ├── api.ts                # API client (typed, auth headers)
+│   │       ├── AuthContext.tsx        # Auth state (login/register/logout)
+│   │       └── Providers.tsx          # Client-side provider wrapper
 │   ├── next.config.ts                # API proxy rewrites
 │   └── package.json
 ├── tests/                            # 88 tests (17 test files)
@@ -319,7 +324,7 @@ trustguard/
 | Auth | python-jose + passlib | JWT tokens, bcrypt password hashing |
 | Database | SQLAlchemy + SQLite | Zero setup, swappable to PostgreSQL |
 | Rate Limiting | slowapi | Per-IP request throttling |
-| Testing | pytest | 88 tests covering detectors, API, orchestration |
+| Testing | pytest | 90 tests covering detectors, API, orchestration |
 | Logging | Loguru | Structured logging with rotation |
 
 ---

@@ -61,7 +61,7 @@ async def detect_deepfake_image(
 async def detect_deepfake_video(
     request: Request,
     file: UploadFile = File(...),
-    sample_frames: int = 30,
+    sample_frames: int = 30,  # Bounded in route to 1-100
     db: Session = Depends(get_db),
 ):
     """Detect deepfake frames in an uploaded video."""
@@ -69,6 +69,7 @@ async def detect_deepfake_video(
         raise HTTPException(status_code=503, detail="Deepfake detector not initialized")
 
     validate_video(file)
+    sample_frames = max(1, min(100, sample_frames))  # Clamp to safe range
 
     async with save_temp_file(file) as temp_path:
         start = time.time()
@@ -113,7 +114,8 @@ async def detect_batch(
                 result["filename"] = file.filename
                 results.append(result)
         except Exception as e:
-            results.append({"filename": file.filename, "error": str(e), "is_deepfake": None})
+            logger.error("Batch processing failed for {}: {}", file.filename, e)
+            results.append({"filename": file.filename, "error": "Processing failed", "is_deepfake": None})
 
     summary = {
         "deepfakes_detected": sum(1 for r in results if r.get("is_deepfake") is True),

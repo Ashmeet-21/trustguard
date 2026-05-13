@@ -70,6 +70,7 @@ async def detect_liveness_video(
         raise HTTPException(status_code=503, detail="Liveness detector not initialized")
 
     validate_video(file)
+    sample_frames = max(1, min(100, sample_frames))  # Clamp to safe range
 
     async with save_temp_file(file) as temp_path:
         start = time.time()

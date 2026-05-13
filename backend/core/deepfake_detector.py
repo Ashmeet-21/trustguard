@@ -50,7 +50,7 @@ class DeepfakeDetector:
         self.model.to(self.device)
         self.model.eval()
 
-        # Model labels: {0: "Fake", 1: "Real"}
+        # Model labels (read from model config so it's always correct)
         self.labels = self.model.config.id2label
         logger.info("Model loaded successfully (labels: {})", self.labels)
 
@@ -82,9 +82,12 @@ class DeepfakeDetector:
             outputs = self.model(**inputs)
             probs = torch.nn.functional.softmax(outputs.logits, dim=1)[0]
 
-        # Model output: index 0 = Fake, index 1 = Real
-        fake_prob = probs[0].item()
-        real_prob = probs[1].item()
+        # Use model's own label mapping to get correct indices
+        # Model id2label: {0: 'Real', 1: 'Fake'}
+        fake_idx = next(i for i, lbl in self.labels.items() if lbl.lower() == "fake")
+        real_idx = next(i for i, lbl in self.labels.items() if lbl.lower() == "real")
+        fake_prob = probs[fake_idx].item()
+        real_prob = probs[real_idx].item()
 
         is_deepfake = fake_prob > 0.5
         confidence = fake_prob if is_deepfake else real_prob

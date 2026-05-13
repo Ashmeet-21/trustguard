@@ -27,13 +27,14 @@ from backend.utils import config
 class LivenessDetector:
 
     # How much each check matters (adds up to 1.0)
-    # Texture and sharpness matter most because they're the best at catching fakes
+    # Face quality is the strongest signal — MediaPipe landmark depth separates 3D faces from flat photos
     WEIGHTS = {
-        "texture": 0.25,
-        "frequency": 0.20,
-        "color": 0.20,
-        "edge": 0.15,
-        "sharpness": 0.20,
+        "face_quality": 0.25,
+        "texture": 0.20,
+        "frequency": 0.15,
+        "color": 0.15,
+        "edge": 0.10,
+        "sharpness": 0.15,
     }
 
     def __init__(self):
@@ -42,7 +43,7 @@ class LivenessDetector:
         self.face_mesh = mp.solutions.face_mesh.FaceMesh(
             static_image_mode=True,     # We're analyzing photos, not video stream
             max_num_faces=1,            # We only need one face
-            min_detection_confidence=0.5,
+            min_detection_confidence=0.3,  # Lower threshold for webcam selfies
         )
         self.threshold = config.LIVENESS_THRESHOLD  # Default 0.7
         logger.info("Liveness detector initialized (threshold={})", self.threshold)
@@ -58,30 +59,34 @@ class LivenessDetector:
         bgr = self._load_image(image_input)
 
         # Step 1: Find the face — if no face, everything else is less reliable
-        face_detected, face_region = self._detect_face(bgr)
+        face_detected, face_region, face_bbox, landmarks = self._detect_face(bgr)
 
         # Analyze just the face area (more accurate), or full image if no face found
         region = face_region if face_region is not None else bgr
 
-        # Step 2-6: Run each check — each returns 0.0 (likely fake) to 1.0 (likely real)
+        # Step 2: Face quality — 3D depth from MediaPipe landmarks (best single signal)
+        face_quality_score = self._check_face_quality(landmarks)
+
+        # Step 3-7: Run image-based checks — each returns 0.0 (likely fake) to 1.0 (likely real)
         texture_score = self._check_texture(region)
         frequency_score = self._check_frequency(region)
         color_score = self._check_color(region)
         edge_score = self._check_edges(region)
         sharpness_score = self._check_sharpness(region)
 
-        # Combine all scores using weights (like a grade: 25% texture + 20% frequency + ...)
+        # Combine all scores using weights
         liveness_score = (
-            self.WEIGHTS["texture"] * texture_score
+            self.WEIGHTS["face_quality"] * face_quality_score
+            + self.WEIGHTS["texture"] * texture_score
             + self.WEIGHTS["frequency"] * frequency_score
             + self.WEIGHTS["color"] * color_score
             + self.WEIGHTS["edge"] * edge_score
             + self.WEIGHTS["sharpness"] * sharpness_score
         )
 
-        # No face found? Cut the score in half — can't trust other checks without a face
+        # No face found? Reduce score — but don't be too harsh, webcam quality varies
         if not face_detected:
-            liveness_score *= 0.5
+            liveness_score *= 0.6
 
         liveness_score = round(float(liveness_score), 4)
         is_live = liveness_score >= self.threshold
@@ -91,6 +96,8 @@ class LivenessDetector:
             "liveness_score": liveness_score,
             "checks": {
                 "face_detected": face_detected,
+                "face_bbox": face_bbox,
+                "face_quality_score": round(float(face_quality_score), 4),
                 "texture_score": round(float(texture_score), 4),
                 "frequency_score": round(float(frequency_score), 4),
                 "color_score": round(float(color_score), 4),
@@ -127,12 +134,16 @@ class LivenessDetector:
 
         HOW: MediaPipe finds 468 face landmarks (dots on eyes, nose, mouth).
              We use those dots to draw a box around the face and crop it.
+
+        Returns: (face_detected, face_region, face_bbox, landmarks)
+             face_bbox has normalized 0-1 coordinates for frontend validation
+             landmarks is the raw MediaPipe landmark list (for depth analysis)
         """
         rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
         results = self.face_mesh.process(rgb)
 
         if not results.multi_face_landmarks:
-            return False, None
+            return False, None, None, None
 
         # Get face bounding box from the landmark points
         h, w = bgr.shape[:2]
@@ -140,20 +151,92 @@ class LivenessDetector:
         xs = [lm.x for lm in landmarks.landmark]
         ys = [lm.y for lm in landmarks.landmark]
 
+        # Normalized coordinates (0-1) for frontend face position validation
+        x_min_pct = min(xs)
+        y_min_pct = min(ys)
+        x_max_pct = max(xs)
+        y_max_pct = max(ys)
+
+        face_bbox = {
+            "x_min": round(x_min_pct, 4),
+            "y_min": round(y_min_pct, 4),
+            "x_max": round(x_max_pct, 4),
+            "y_max": round(y_max_pct, 4),
+            "width_pct": round(x_max_pct - x_min_pct, 4),
+            "height_pct": round(y_max_pct - y_min_pct, 4),
+        }
+
         # Landmarks are 0-1 percentages, so multiply by image size to get pixels
         # Add 20px padding around the face so we don't crop too tight
-        x_min = max(0, int(min(xs) * w) - 20)
-        y_min = max(0, int(min(ys) * h) - 20)
-        x_max = min(w, int(max(xs) * w) + 20)
+        x_min = max(0, int(x_min_pct * w) - 20)
+        y_min = max(0, int(y_min_pct * h) - 20)
+        x_max = min(w, int(x_max_pct * w) + 20)
         y_max = min(h, int(max(ys) * h) + 20)
 
         face_region = bgr[y_min:y_max, x_min:x_max]
         if face_region.size == 0:
-            return True, None
+            return True, None, face_bbox, landmarks
 
-        return True, face_region
+        return True, face_region, face_bbox, landmarks
 
-    # ── Check 2: Texture (LBP) ──────────────────────────────
+    # ── Check 2: Face Quality (3D Depth from Landmarks) ────
+
+    def _check_face_quality(self, landmarks) -> float:
+        """
+        WHY: A real 3D face has DEPTH — nose sticks out, eye sockets recede.
+             A flat photo or screen has no real depth. MediaPipe estimates
+             z-coordinates for each landmark based on perceived depth.
+
+        HOW: Measure the variance of z-coordinates across all 468 landmarks.
+             High z-variance = real 3D face structure.
+             Low z-variance = flat image (photo/screen).
+             Also check landmark count — full 468 = confident detection.
+        """
+        if landmarks is None:
+            return 0.0
+
+        landmark_list = landmarks.landmark
+        num_landmarks = len(landmark_list)
+
+        # Score 1: Landmark count — 468 = full face mesh = confident detection
+        count_score = min(1.0, num_landmarks / 468.0)
+
+        # Score 2: Z-depth variance — real 3D faces have more depth variation
+        zs = [lm.z for lm in landmark_list]
+        z_range = max(zs) - min(zs)
+        z_std = float(np.std(zs))
+
+        # Real face z_range: typically 0.05-0.20 (nose tip vs ears)
+        # Flat photo z_range: typically 0.01-0.04 (almost flat)
+        if z_range > 0.06:
+            depth_score = min(1.0, 0.7 + z_range * 2)
+        elif z_range > 0.03:
+            depth_score = 0.5
+        else:
+            depth_score = 0.2
+
+        # Score 3: Spatial consistency — landmarks should be symmetrical
+        # Compare left-right landmark pairs (e.g., left eye vs right eye z-values)
+        # Real faces are roughly symmetrical, random images are not
+        xs = [lm.x for lm in landmark_list]
+        x_center = (min(xs) + max(xs)) / 2
+        left_zs = [lm.z for lm in landmark_list if lm.x < x_center]
+        right_zs = [lm.z for lm in landmark_list if lm.x >= x_center]
+
+        if left_zs and right_zs:
+            left_mean = np.mean(left_zs)
+            right_mean = np.mean(right_zs)
+            # Symmetry: left and right halves should have similar mean depth
+            symmetry_diff = abs(left_mean - right_mean)
+            symmetry_score = max(0.0, 1.0 - symmetry_diff * 20)
+        else:
+            symmetry_score = 0.5
+
+        # Combine: 40% depth + 30% count + 30% symmetry
+        quality = 0.4 * depth_score + 0.3 * count_score + 0.3 * symmetry_score
+        return max(0.0, min(1.0, quality))
+
+    # ── Check 3: Texture (LBP) ──────────────────────────────
 
     def _check_texture(self, bgr: np.ndarray) -> float:
         """
@@ -180,8 +263,18 @@ class LivenessDetector:
 
         # High variance = many different patterns = real skin texture
         variance = np.var(hist)
-        score = min(1.0, variance / 0.0005)  # Normalize to 0-1 range
-        return score
+        # Webcam JPEG compression reduces texture variance, so use a gradual curve
+        # instead of a hard threshold. Real face variance: 0.0001-0.001+
+        # Fake (flat print/screen): 0.00001-0.00005
+        if variance > 0.0004:
+            score = 0.95
+        elif variance > 0.0002:
+            score = 0.7 + (variance - 0.0002) / 0.0002 * 0.25
+        elif variance > 0.00005:
+            score = 0.4 + (variance - 0.00005) / 0.00015 * 0.3
+        else:
+            score = variance / 0.00005 * 0.4
+        return max(0.0, min(1.0, score))
 
     # ── Check 3: Frequency (FFT) ────────────────────────────
 
@@ -271,13 +364,13 @@ class LivenessDetector:
         # What fraction of pixels are edges?
         density = edges.sum() / (255.0 * edges.size)
 
-        # Sweet spot is around 3-20% edge density
-        if 0.03 <= density <= 0.20:
-            # Closer to 10% = better score
-            score = 1.0 - abs(density - 0.10) / 0.10
+        # Sweet spot is around 2-25% edge density (widened for webcam quality)
+        if 0.02 <= density <= 0.25:
+            # Closer to 8% = better score (webcams tend to have slightly fewer edges)
+            score = 1.0 - abs(density - 0.08) / 0.17
         else:
             # Way outside normal range = likely fake
-            score = max(0.0, 0.5 - abs(density - 0.10) * 3)
+            score = max(0.0, 0.5 - abs(density - 0.08) * 2)
 
         return max(0.0, min(1.0, score))
 
@@ -298,15 +391,20 @@ class LivenessDetector:
         gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
         sharpness = cv2.Laplacian(gray, cv2.CV_64F).var()
 
-        # Score based on where sharpness falls
-        if sharpness < 10:
-            score = 0.2        # Very blurry = likely a bad copy
-        elif sharpness < 50:
-            score = 0.5        # Somewhat blurry = suspicious
-        elif sharpness < 3000:
-            score = min(1.0, 0.6 + (sharpness / 3000) * 0.4)  # Normal range = good
+        # Score based on where sharpness falls (calibrated for webcam images)
+        # Webcam selfies: typically 30-3000 (wide range due to sensor quality)
+        # Photo-of-photo: typically < 15 (double compression = blurry)
+        # Screen replay: can be > 5000 (pixel-perfect digital copy)
+        if sharpness < 3:
+            score = 0.15       # Extremely blurry — almost certainly a bad copy
+        elif sharpness < 10:
+            score = 0.3 + (sharpness - 3) / 7 * 0.15  # Very blurry — gradual
+        elif sharpness < 30:
+            score = 0.45 + (sharpness - 10) / 20 * 0.25  # Low but possible for cheap webcam
+        elif sharpness < 5000:
+            score = 0.7 + min(0.25, (sharpness - 30) / 2000 * 0.25)  # Normal webcam range
         else:
-            score = max(0.3, 1.0 - (sharpness - 3000) / 10000)  # Too sharp = suspicious
+            score = max(0.3, 0.95 - (sharpness - 5000) / 15000)  # Too sharp = suspicious
 
         return max(0.0, min(1.0, score))
 

@@ -14,9 +14,14 @@ are expensive (they run ML models), so I limit those to 10/minute. Auth endpoint
 get 5/minute to prevent brute-force password attacks."
 """
 
+import os
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 # Track requests by IP address
 # In production, you'd use Redis instead of in-memory storage
-limiter = Limiter(key_func=get_remote_address)
+# Disable rate limiting during tests to avoid flaky failures
+limiter = Limiter(
+    key_func=get_remote_address,
+    enabled=os.getenv("TESTING", "").lower() != "true",
+)

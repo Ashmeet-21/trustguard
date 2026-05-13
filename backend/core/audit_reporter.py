@@ -16,6 +16,7 @@ final verdict. This is essential for compliance in fintech/KYC."
 
 import json
 import os
+from collections import OrderedDict
 from datetime import datetime
 from pathlib import Path
 from loguru import logger
@@ -30,9 +31,11 @@ AUDIT_DIR = Path(__file__).parent.parent / "audit_reports"
 class AuditReporter:
     """Generates and stores audit reports for verification sessions."""
 
+    MAX_CACHE_SIZE = 1000
+
     def __init__(self):
         AUDIT_DIR.mkdir(exist_ok=True)
-        self._reports = {}  # In-memory cache for quick retrieval
+        self._reports = OrderedDict()  # Bounded LRU cache
         logger.info("Audit reporter initialized (dir={})", AUDIT_DIR)
 
     def generate_report(self, session_id: str, session_result: dict, metadata: dict = None) -> dict:
@@ -71,6 +74,9 @@ class AuditReporter:
         # Save and store
         self.save_report(report, session_id)
         self._reports[session_id] = report
+        # Evict oldest if cache is full
+        while len(self._reports) > self.MAX_CACHE_SIZE:
+            self._reports.popitem(last=False)
 
         logger.info("Audit report generated for session {}", session_id)
         return report
@@ -111,6 +117,8 @@ class AuditReporter:
                 with open(file_path, "r") as f:
                     report = json.load(f)
                 self._reports[session_id] = report
+                while len(self._reports) > self.MAX_CACHE_SIZE:
+                    self._reports.popitem(last=False)
                 return report
             except Exception as e:
                 logger.error("Failed to read audit report: {}", e)

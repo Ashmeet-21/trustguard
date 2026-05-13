@@ -10,6 +10,9 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+# Disable rate limiting in tests
+os.environ["TESTING"] = "true"
+
 # Make sure backend is importable
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
