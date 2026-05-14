@@ -66,17 +66,19 @@ async def lifespan(app):
     Base.metadata.create_all(bind=engine)
     logger.info("Database tables ready")
 
-    # Initialize deepfake detector
-    try:
-        detector = DeepfakeDetector(model_path=config.DEEPFAKE_MODEL_PATH)
-    except Exception as e:
-        logger.warning("Could not load trained model: {}. Using default weights.", e)
-        detector = DeepfakeDetector()
+    # Initialize HF Gateway first — used by both deepfake and voice detectors
+    hf_gateway = HFGateway()
 
-    # Make detector available to routes
+    # Initialize deepfake detector — uses HF API when token is set, local model otherwise
+    try:
+        detector = DeepfakeDetector(model_path=config.DEEPFAKE_MODEL_PATH, hf_gateway=hf_gateway)
+    except Exception as e:
+        logger.warning("Could not load deepfake detector: {}. Retrying without model path.", e)
+        detector = DeepfakeDetector(hf_gateway=hf_gateway)
+
     routes_deepfake.detector = detector
     routes_general.deepfake_detector_loaded = True
-    logger.info("Deepfake detector initialized")
+    logger.info("Deepfake detector initialized (mode: {})", detector._mode)
 
     # Initialize liveness detector
     liveness_detector = LivenessDetector()
@@ -84,8 +86,7 @@ async def lifespan(app):
     routes_general.liveness_detector_loaded = True
     logger.info("Liveness detector initialized")
 
-    # Initialize HF Gateway + Voice Detector
-    hf_gateway = HFGateway()
+    # Initialize Voice Detector (reuses HF Gateway)
     voice_detector = VoiceDetector(hf_gateway)
     routes_voice.detector = voice_detector
     routes_general.voice_detector_loaded = True

@@ -6,14 +6,18 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1-mesa-glx \
     libglib2.0-0 \
+    libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Install production Python dependencies (no torch — uses HF Inference API)
+COPY requirements-prod.txt .
+RUN pip install --no-cache-dir -r requirements-prod.txt
 
 # Copy application code
 COPY backend/ backend/
+
+# Create logs dir and a stub .env (real secrets come from env vars at runtime)
+RUN mkdir -p logs
 COPY .env.example .env
 
 EXPOSE 8000

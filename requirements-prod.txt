@@ -1,0 +1,35 @@
+# TrustGuard - Production Dependencies
+# Excludes torch/transformers — deepfake detection uses HF Inference API (set HF_TOKEN)
+
+# ── Web Framework ────────────────────────────
+fastapi==0.128.5
+uvicorn[standard]==0.27.0
+python-multipart==0.0.6
+slowapi==0.1.9
+
+# ── Data Validation ──────────────────────────
+pydantic==2.12.5
+pydantic-settings==2.12.0
+
+# ── Database ─────────────────────────────────
+sqlalchemy==2.0.46
+
+# ── Authentication ───────────────────────────
+python-jose[cryptography]==3.5.0
+passlib[bcrypt]==1.7.4
+bcrypt==4.1.3
+
+# ── Image / Video Processing ────────────────
+opencv-python-headless==4.9.0.80
+pillow==10.2.0
+mediapipe==0.10.9
+numpy==1.26.2
+
+# ── HuggingFace API (deepfake + voice detection) ─
+huggingface_hub==0.26.5
+
+# ── Logging ──────────────────────────────────
+loguru==0.7.3
+
+# ── Config ───────────────────────────────────
+python-dotenv==1.0.0
