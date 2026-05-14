@@ -1,5 +1,6 @@
 # TrustGuard - Production Dependencies
-# Excludes torch/transformers — deepfake detection uses HF Inference API (set HF_TOKEN)
+# No torch/transformers — deepfake detection uses HF Inference API (set HF_TOKEN)
+# Note: mediapipe pulls in opencv-contrib-python — do not add opencv separately
 
 # ── Web Framework ────────────────────────────
 fastapi==0.128.5
@@ -19,14 +20,17 @@ python-jose[cryptography]==3.5.0
 passlib[bcrypt]==1.7.4
 bcrypt==4.1.3
 
-# ── Image / Video Processing ────────────────
-opencv-python-headless==4.9.0.80
-pillow==10.2.0
+# ── Image / Video Processing ─────────────────
+# mediapipe installs its required opencv-contrib-python automatically
 mediapipe==0.10.9
+pillow==10.2.0
 numpy==1.26.2
 
+# ── Audio Processing (voice detection fallback) ─
+scipy>=1.11.0
+
 # ── HuggingFace API (deepfake + voice detection) ─
-huggingface_hub==0.26.5
+huggingface_hub>=0.24.0
 
 # ── Logging ──────────────────────────────────
 loguru==0.7.3
