@@ -403,7 +403,7 @@ export default function Home() {
       <footer className="border-t border-white/[0.03] py-6 text-center">
         <p className="text-[11px] text-white/15">
           TrustGuard v1.0.0 &middot; Built by Ashmeet Singh &middot;{" "}
-          <a href="http://localhost:8000/docs" className="text-white/20 hover:text-white/40 transition-colors">
+          <a href={`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/docs`} className="text-white/20 hover:text-white/40 transition-colors">
             API Docs
           </a>
         </p>

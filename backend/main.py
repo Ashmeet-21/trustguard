@@ -212,9 +212,9 @@ Detection endpoints are rate-limited per IP (10/min for images, 5/min for video,
     version=config.APP_VERSION,
     lifespan=lifespan,
     openapi_tags=tags_metadata,
-    docs_url="/docs" if config.DEBUG else None,
-    redoc_url="/redoc" if config.DEBUG else None,
-    openapi_url="/openapi.json" if config.DEBUG else None,
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json",
 )
 
 # Security headers

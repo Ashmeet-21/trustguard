@@ -53,7 +53,7 @@ export default function Navbar() {
           })}
           <div className="w-px h-5 bg-white/[0.06] mx-2" />
           <a
-            href="http://localhost:8000/docs"
+            href={`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/docs`}
             target="_blank"
             rel="noopener noreferrer"
             className="px-3.5 py-1.5 rounded-lg text-[13px] font-medium text-white/30 hover:text-white/60 transition-all duration-300 flex items-center gap-1.5"
