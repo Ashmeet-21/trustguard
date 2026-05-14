@@ -306,7 +306,9 @@ export default function DashboardPage() {
                             className="text-[11px] font-medium"
                             style={{ color: item.is_deepfake ? "#f87171" : "#4ade80", opacity: 0.7 }}
                           >
-                            {item.is_deepfake ? "FLAGGED" : "CLEAN"}
+                            {["liveness_image", "liveness_video"].includes(item.type)
+                              ? item.is_deepfake ? "SPOOF" : "LIVE"
+                              : item.is_deepfake ? "FLAGGED" : "CLEAN"}
                           </span>
                         ) : (
                           <span className="text-white/10">—</span>

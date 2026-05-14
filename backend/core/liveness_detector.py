@@ -412,17 +412,17 @@ class LivenessDetector:
 
     def _get_risk_level(self, liveness_score: float) -> str:
         """
-        Higher liveness score = more likely real = lower risk.
-        0.8+ = LOW risk (probably real)
-        0.6+ = MEDIUM risk (uncertain)
-        0.4+ = HIGH risk (probably fake)
-        below 0.4 = CRITICAL (almost certainly fake)
+        Aligned with is_live threshold (0.7) so LIVE always maps to LOW risk.
+        0.7+ = LOW  (is_live=True  — passed)
+        0.5+ = MEDIUM (is_live=False — borderline)
+        0.3+ = HIGH   (is_live=False — likely spoof)
+        <0.3  = CRITICAL (is_live=False — almost certainly fake)
         """
-        if liveness_score >= 0.8:
+        if liveness_score >= 0.7:
             return "LOW"
-        elif liveness_score >= 0.6:
+        elif liveness_score >= 0.5:
             return "MEDIUM"
-        elif liveness_score >= 0.4:
+        elif liveness_score >= 0.3:
             return "HIGH"
         else:
             return "CRITICAL"
