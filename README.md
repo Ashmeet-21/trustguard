@@ -3,8 +3,12 @@
 ![Python 3.11](https://img.shields.io/badge/Python-3.11-blue)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.128-green)
 ![Next.js 16](https://img.shields.io/badge/Next.js-16-black)
-![Tests](https://img.shields.io/badge/Tests-102%20passing-brightgreen)
+[![CI](https://github.com/Ashmeet-21/trustguard/actions/workflows/ci.yml/badge.svg)](https://github.com/Ashmeet-21/trustguard/actions/workflows/ci.yml)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
+
+**🔗 Live demo: [steady-semolina-01c7cf.netlify.app](https://steady-semolina-01c7cf.netlify.app/)** · **API docs: [trustguard-bgba.onrender.com/docs](https://trustguard-bgba.onrender.com/docs)**
+
+> Hosted on free tiers — the backend sleeps when idle, so the first request can take ~1 minute to wake it up.
 
 A full-stack identity verification platform that combines **4 AI detection agents** — deepfake detection, liveness checking, voice analysis, and behavioral biometrics — into a single trust score through an orchestrated pipeline with quality gates and audit trails.
 
