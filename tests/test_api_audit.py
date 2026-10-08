@@ -16,13 +16,19 @@ def setup_audit_reporter():
     routes_audit.reporter = original
 
 
-def test_audit_report_not_found(client):
+def test_audit_requires_auth(client):
+    """Audit reports should reject requests without a token."""
+    response = client.get("/api/v1/audit/?limit=5")
+    assert response.status_code == 401
+
+
+def test_audit_report_not_found(client, auth_headers):
     """Should return 404 for non-existent session."""
-    response = client.get("/api/v1/audit/nonexistent-session-id")
+    response = client.get("/api/v1/audit/nonexistent-session-id", headers=auth_headers)
     assert response.status_code == 404
 
 
-def test_audit_report_creation_and_retrieval(client):
+def test_audit_report_creation_and_retrieval(client, auth_headers):
     """Should be able to generate and retrieve an audit report."""
     reporter = routes_audit.reporter
     # Manually generate a report
@@ -39,7 +45,7 @@ def test_audit_report_creation_and_retrieval(client):
     }
     reporter.generate_report("test-session-123", session_result)
 
-    response = client.get("/api/v1/audit/test-session-123")
+    response = client.get("/api/v1/audit/test-session-123", headers=auth_headers)
     assert response.status_code == 200
     data = response.json()
     assert data["session_id"] == "test-session-123"
@@ -47,8 +53,8 @@ def test_audit_report_creation_and_retrieval(client):
     assert data["trust_score"] == 85.0
 
 
-def test_recent_reports_endpoint(client):
+def test_recent_reports_endpoint(client, auth_headers):
     """Should return list of recent reports."""
-    response = client.get("/api/v1/audit/?limit=5")
+    response = client.get("/api/v1/audit/?limit=5", headers=auth_headers)
     assert response.status_code == 200
     assert isinstance(response.json(), list)

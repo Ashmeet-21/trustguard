@@ -58,3 +58,6 @@ files*/
 # Internal docs
 TRUSTGUARD_INTERVIEW_GUIDE.md
 TRUSTGUARD_PRESENTATION.md
+
+# Local Netlify folder
+.netlify

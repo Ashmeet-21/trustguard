@@ -54,8 +54,8 @@ def test_register_weak_password_no_uppercase(client):
         "email": "weak@example.com",
         "password": "securepass123!",
     })
-    assert response.status_code == 400
-    assert "uppercase" in response.json()["detail"]
+    assert response.status_code == 422  # rejected by the Pydantic schema validator
+    assert "uppercase" in str(response.json()["detail"])
 
 
 def test_register_weak_password_no_special(client):
@@ -64,8 +64,8 @@ def test_register_weak_password_no_special(client):
         "email": "weak2@example.com",
         "password": "SecurePass1234",
     })
-    assert response.status_code == 400
-    assert "special" in response.json()["detail"]
+    assert response.status_code == 422  # rejected by the Pydantic schema validator
+    assert "special" in str(response.json()["detail"])
 
 
 def test_login_success(client):

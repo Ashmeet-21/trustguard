@@ -67,3 +67,12 @@ def client():
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()
+
+
+@pytest.fixture()
+def auth_headers(client):
+    """Register (if needed) and log in a test user, return the Bearer header."""
+    email, password = "fixture@example.com", "SecurePass123!"
+    client.post("/api/v1/auth/register", json={"email": email, "password": password})
+    resp = client.post("/api/v1/auth/login", data={"username": email, "password": password})
+    return {"Authorization": f"Bearer {resp.json()['access_token']}"}

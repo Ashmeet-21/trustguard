@@ -84,7 +84,9 @@ def test_all_checks_return_scores(detector):
 
 def test_risk_level_mapping(detector):
     """Risk levels should map correctly from liveness scores."""
+    # Aligned with the 0.7 is_live threshold: LIVE always maps to LOW risk
     assert detector._get_risk_level(0.9) == "LOW"
-    assert detector._get_risk_level(0.7) == "MEDIUM"
-    assert detector._get_risk_level(0.5) == "HIGH"
+    assert detector._get_risk_level(0.7) == "LOW"
+    assert detector._get_risk_level(0.6) == "MEDIUM"
+    assert detector._get_risk_level(0.4) == "HIGH"
     assert detector._get_risk_level(0.2) == "CRITICAL"

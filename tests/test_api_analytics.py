@@ -1,9 +1,15 @@
 """Tests for analytics endpoints."""
 
 
-def test_analytics_summary(client):
-    """Should return analytics summary with correct structure."""
+def test_analytics_requires_auth(client):
+    """Analytics should reject requests without a token."""
     response = client.get("/api/v1/analytics/summary")
+    assert response.status_code == 401
+
+
+def test_analytics_summary(client, auth_headers):
+    """Should return analytics summary with correct structure."""
+    response = client.get("/api/v1/analytics/summary", headers=auth_headers)
     assert response.status_code == 200
 
     data = response.json()
@@ -20,18 +26,18 @@ def test_analytics_summary(client):
     assert data["deepfakes_caught"] >= 0
 
 
-def test_analytics_recent(client):
+def test_analytics_recent(client, auth_headers):
     """Should return a list of recent verifications."""
-    response = client.get("/api/v1/analytics/recent")
+    response = client.get("/api/v1/analytics/recent", headers=auth_headers)
     assert response.status_code == 200
 
     data = response.json()
     assert isinstance(data, list)
 
 
-def test_analytics_recent_with_limit(client):
+def test_analytics_recent_with_limit(client, auth_headers):
     """Should respect the limit parameter."""
-    response = client.get("/api/v1/analytics/recent?limit=5")
+    response = client.get("/api/v1/analytics/recent?limit=5", headers=auth_headers)
     assert response.status_code == 200
 
     data = response.json()
@@ -39,7 +45,7 @@ def test_analytics_recent_with_limit(client):
     assert len(data) <= 5
 
 
-def test_analytics_recent_invalid_limit(client):
+def test_analytics_recent_invalid_limit(client, auth_headers):
     """Should reject limit > 100."""
-    response = client.get("/api/v1/analytics/recent?limit=200")
+    response = client.get("/api/v1/analytics/recent?limit=200", headers=auth_headers)
     assert response.status_code == 422  # Pydantic validation error

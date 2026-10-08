@@ -3,7 +3,7 @@
 ![Python 3.11](https://img.shields.io/badge/Python-3.11-blue)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.128-green)
 ![Next.js 16](https://img.shields.io/badge/Next.js-16-black)
-![Tests](https://img.shields.io/badge/Tests-90%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/Tests-92%20passing-brightgreen)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
 
 A full-stack identity verification platform that combines **4 AI detection agents** — deepfake detection, liveness checking, voice analysis, and behavioral biometrics — into a single trust score through an orchestrated pipeline with quality gates and audit trails.
@@ -181,7 +181,7 @@ Runs both backend (port 8000) and frontend (port 3000).
 ## Running Tests
 
 ```bash
-# All 90 tests
+# All 92 tests
 pytest tests/ -v
 
 # By module
@@ -301,7 +301,7 @@ trustguard/
 │   │       └── Providers.tsx          # Client-side provider wrapper
 │   ├── next.config.ts                # API proxy rewrites
 │   └── package.json
-├── tests/                            # 88 tests (17 test files)
+├── tests/                            # 92 tests (16 test files)
 ├── Dockerfile                        # Backend container
 ├── docker-compose.yml                # Full-stack orchestration
 ├── requirements.txt                  # Python dependencies
@@ -324,7 +324,7 @@ trustguard/
 | Auth | python-jose + passlib | JWT tokens, bcrypt password hashing |
 | Database | SQLAlchemy + SQLite | Zero setup, swappable to PostgreSQL |
 | Rate Limiting | slowapi | Per-IP request throttling |
-| Testing | pytest | 90 tests covering detectors, API, orchestration |
+| Testing | pytest | 92 tests covering detectors, API, orchestration |
 | Logging | Loguru | Structured logging with rotation |
 
 ---
