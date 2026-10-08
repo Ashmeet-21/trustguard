@@ -55,9 +55,15 @@ docker-compose up --build                       # both services
 - Dark theme, gradient #00d4ff → #7b2ff7. Next 16 gotcha: `useRef<T>(undefined)` needs an initial value.
 
 ## Deploy / CI
-- Backend: `render.yaml` (Docker, `requirements-prod.txt` = no torch → needs HF_TOKEN). Has `CORS_ORIGINS="*"` — should be locked to frontend URL.
-- Frontend: `netlify.toml` (base `frontend`, @netlify/plugin-nextjs).
-- **No live demo URL yet** (GitHub "website" field empty). Unknown if Render/Netlify are actually running.
+- **LIVE** (verified 2026-10-08): frontend https://steady-semolina-01c7cf.netlify.app (Netlify site id c8bed503-…), backend https://trustguard-bgba.onrender.com (Render free tier, auto-deploys `master`, sleeps when idle ~1 min cold start).
+  - Browser calls same-origin `/api/*` → Next.js rewrite on Netlify proxies to backend (`NEXT_PUBLIC_API_URL`).
+  - `trustguard-backend.onrender.com` is a DIFFERENT, suspended service — not ours to use; render.yaml `name:` doesn't match the live one, so env vars are really managed in the Render dashboard.
+  - `render.yaml` CORS now = Netlify URL (also set it in the Render dashboard).
+- **Prod deepfake check is broken (2026-10-08):** HF API rejects calls → `/detect/deepfake/image` returns 503, sessions run without image_agent. Model `dima806/...` IS live on hf-inference, so cause = HF_TOKEN in Render (invalid/expired/missing "Inference Providers" permission/out of free credits). User must fix in Render dashboard; check Render logs for "HF image_classification failed".
+  - Before the fail-closed fix this was hidden (every image was silently called REAL).
+- Voice model `MattyB95/AST-ASVspoof2019...` is NOT served by any HF inference provider → prod voice always uses local spectral fallback.
+- `datasets/test_images/test_face.jpg` scores liveness 0.148 (SPOOF) locally and in prod → liveness thresholds need calibration (benchmark step).
+- GitHub repo homepage + topics set; README has live links + real CI badge.
 - CI: `.github/workflows/ci.yml` — fixed 2026-10-08 to trigger on `master` (was `main`, so it had never run). Not yet confirmed green on GitHub.
 
 ## Known gotchas
