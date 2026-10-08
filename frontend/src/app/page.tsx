@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "TrustGuard — AI-Powered Identity Verification",
   description:
-    "Detect deepfakes, verify liveness, analyze voice authenticity, and check behavioral patterns — all in one platform with 99%+ accuracy.",
+    "Detect deepfakes, verify liveness, analyze voice authenticity, and check behavioral patterns — all combined into one trust score.",
 };
 
 export default function Home() {
@@ -62,10 +62,10 @@ export default function Home() {
           {/* Stats bar */}
           <div className="fade-up stagger-5 mt-16 flex items-center justify-center gap-8 md:gap-14">
             {[
-              { value: "99.3%", label: "Model Accuracy" },
               { value: "4", label: "AI Agents" },
+              { value: "3", label: "Quality Gates" },
               { value: "<5s", label: "Verification" },
-              { value: "90+", label: "Tests Passing" },
+              { value: "100+", label: "Tests Passing" },
             ].map((stat, i) => (
               <div key={i} className="text-center">
                 <div className="text-lg md:text-xl font-bold text-white/80 font-mono">{stat.value}</div>
@@ -117,10 +117,15 @@ export default function Home() {
               patterns that distinguish real photos from AI-generated faces.
             </p>
             <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2 text-[11px] bg-[#4ade80]/[0.06] text-[#4ade80]/80 px-3 py-1.5 rounded-lg border border-[#4ade80]/10">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#4ade80]" />
-                99.27% accuracy
-              </div>
+              <a
+                href="https://github.com/Ashmeet-21/trustguard/blob/master/benchmarks/RESULTS.md"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 text-[11px] bg-[#fbbf24]/[0.06] text-[#fbbf24]/80 px-3 py-1.5 rounded-lg border border-[#fbbf24]/10 hover:text-[#fbbf24] transition-colors"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-[#fbbf24]" />
+                Open benchmark results
+              </a>
               <span className="text-[11px] text-white/15 font-mono">HuggingFace ViT</span>
             </div>
           </div>

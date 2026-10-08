@@ -20,7 +20,7 @@ export const metadata: Metadata = {
     template: "%s | TrustGuard",
   },
   description:
-    "Verify real humans with 4 AI agents: deepfake detection (99%+ accuracy), liveness analysis, voice verification, and behavioral biometrics — all combined into one trust score.",
+    "Verify real humans with 4 AI agents: deepfake detection, liveness analysis, voice verification, and behavioral biometrics — all combined into one trust score.",
   keywords: [
     "identity verification",
     "deepfake detection",

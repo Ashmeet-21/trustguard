@@ -73,7 +73,8 @@ docker-compose up --build                       # both services
 - mediapipe 0.10.9 pulls opencv-contrib — don't add opencv separately in prod reqs.
 
 ## Honest gaps (say this in interviews, don't hide it)
-- No real-world accuracy benchmark yet. "99%+" is the **model author's** claim, not ours.
+- **Benchmark done 2026-10-08** (`benchmarks/run_benchmark.py`, results in `benchmarks/RESULTS.md`): on DeepFakeFace (unseen generators) the deepfake model catches 1/99 fakes, AUC 0.405 (worse than guessing). Sanity check on its training-style data (Hemg/deepfake-and-real-images): 100/100 → our pipeline is correct, the model doesn't generalize. All "99%" claims removed from README + landing page.
+  - Script reads remote zips via `HfFileSystem` (downloads only sampled images to gitignored `datasets/deepfakeface/`). pyarrow installed in venv only for the one-off sanity check (not in requirements).
 - Liveness/voice/behavior thresholds are hand-tuned; liveness tested on 1 image (`datasets/test_images/test_face.jpg`).
 - False positive / negative rates unknown.
 
@@ -86,7 +87,7 @@ docker-compose up --build                       # both services
 ## Polish plan (started 2026-10-08)
 1. [x] Fix stale tests + CI branch fix (commit 42f2383). CI then caught missing `scipy` in requirements.txt.
 1b. [x] Security review & cleanup (2026-10-08): 9 vulns/bugs fixed, redundant code removed, 102 tests.
-2. [ ] Benchmark script (`benchmarks/`) on a labeled dataset the model was NOT trained on (dima806 likely trained on a Kaggle deepfake set — avoid it to prevent leakage). Report accuracy / FPR / FNR, tune thresholds.
+2. [x] Benchmark (2026-10-08) — model fails on unseen fakes (see Honest gaps). Next option: swap in a more robust deepfake model and re-run the same benchmark to compare.
 3. [ ] Live demo (Render + Netlify), add URL to README + GitHub website field, add repo topics.
 4. [ ] README rewrite: demo link + GIF at top, results table, "Limitations & next steps", drop "99%" as own claim.
 5. [ ] Cleanups: CORS lock, root `test_setup.py`.

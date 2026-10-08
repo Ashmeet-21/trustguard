@@ -16,6 +16,29 @@ Built with FastAPI, Next.js, OpenCV, MediaPipe, HuggingFace Transformers, and a 
 
 ---
 
+## Benchmark — does the deepfake model work on fakes it has never seen?
+
+The pretrained model reports **99.27%** accuracy — on its own training data. I tested it on
+[DeepFakeFace](https://huggingface.co/datasets/OpenRL/DeepFakeFace), a dataset it was **not** trained on
+(100 real photos + 99 fakes from Stable Diffusion text-to-image, inpainting and InsightFace face swap):
+
+| Test set | Fakes caught | Real photos correct |
+|---|---|---|
+| Images like its training data (sanity check) | **50 / 50** | **50 / 50** |
+| Unseen generators (DeepFakeFace) | **1 / 99** | 99 / 100 |
+
+AUC on the unseen set is **0.41** — no better than guessing, so changing the threshold can't fix it.
+
+**What this means:** the pipeline is correct (100% on familiar data), but the model learned the specific
+fakes it was trained on rather than what makes a face fake in general — a well-known weakness of
+deepfake detectors. This is exactly why TrustGuard doesn't rely on one check: liveness, voice, behavior and
+the quality gates still apply, and a crashed or unavailable detector can never produce an automatic PASS.
+
+Full results and per-generator numbers: [benchmarks/RESULTS.md](benchmarks/RESULTS.md) ·
+reproduce with `python -m benchmarks.run_benchmark`.
+
+---
+
 ## Architecture
 
 ```
@@ -35,7 +58,7 @@ Built with FastAPI, Next.js, OpenCV, MediaPipe, HuggingFace Transformers, and a 
 │  Session Orchestrator                                              │
 │  │   Creates session → routes data to agents → collects results   │
 │  │                                                                 │
-│  ├── Agent 1: Deepfake Detector    (ViT model, 99%+ accuracy)     │
+│  ├── Agent 1: Deepfake Detector    (pretrained ViT model)         │
 │  ├── Agent 2: Liveness Detector    (6 OpenCV/MediaPipe checks)    │
 │  ├── Agent 3: Voice Detector       (HF API + spectral fallback)   │
 │  └── Agent 4: Behavior Analyzer    (keystroke + mouse patterns)   │
@@ -324,7 +347,7 @@ trustguard/
 | Backend API | FastAPI | Async, auto-generated docs, Pydantic validation |
 | Frontend | Next.js 16 + React 19 | App router, TypeScript, server components |
 | Styling | Tailwind CSS v4 | Dark theme with cyan→purple gradient accents |
-| Deepfake Detection | PyTorch + HuggingFace ViT | Pretrained model, 99%+ accuracy |
+| Deepfake Detection | PyTorch + HuggingFace ViT | Pretrained model — see [benchmark](benchmarks/RESULTS.md) for real-world accuracy |
 | Liveness Detection | OpenCV + MediaPipe | Lightweight, no GPU needed, 6 explainable checks |
 | Voice Detection | HuggingFace API + scipy | API primary, local spectral fallback |
 | Behavioral Analysis | NumPy | Pure rule-based, no training data needed |
