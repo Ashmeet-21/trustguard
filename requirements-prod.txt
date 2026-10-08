@@ -1,5 +1,5 @@
 # TrustGuard - Production Dependencies
-# No torch/transformers — deepfake detection uses HF Inference API (set HF_TOKEN)
+# No torch/transformers — the deepfake model runs from backend/models/deepfake_vit_int8.onnx with onnxruntime
 # Note: mediapipe pulls in opencv-contrib-python — do not add opencv separately
 
 # ── Web Framework ────────────────────────────
@@ -28,6 +28,7 @@ numpy==1.26.2
 
 # ── Audio Processing (voice detection fallback) ─
 scipy>=1.11.0
+onnxruntime==1.20.1      # deepfake model runs locally from backend/models/*.onnx — no torch, no paid API
 
 # ── HuggingFace API (deepfake + voice detection) ─
 huggingface_hub>=0.24.0

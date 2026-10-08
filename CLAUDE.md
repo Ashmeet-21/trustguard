@@ -15,7 +15,7 @@ Multi-modal identity verification platform (portfolio project by Ashmeet Singh, 
 
 ## Commands (Windows, run from project root)
 ```
-venv\Scripts\python -m pytest tests/ -q        # 104 tests, ~35s (deepfake test loads ViT model)
+venv\Scripts\python -m pytest tests/ -q        # 105 tests, ~35s (deepfake test loads ViT model)
 venv\Scripts\python -m backend.main             # backend on :8000, docs at /docs
 cd frontend && npm run dev                      # frontend on :3000 (proxies /api → :8000)
 cd frontend && npm run build                    # verify frontend builds
@@ -27,7 +27,11 @@ docker-compose up --build                       # both services
 ## Backend layout (`backend/`)
 - `main.py` — creates singletons: HFGateway, DeepfakeDetector, LivenessDetector, VoiceDetector, BehaviorAnalyzer, RiskEngine, SessionOrchestrator, AuditReporter; registers 11 routers.
 - `core/`
-  - `deepfake_detector.py` — model = `config.HF_IMAGE_MODEL`, default **`buildborderless/CommunityForensics-DeepfakeDet-ViT`** (switched 2026-10-08 from dima806 after benchmark; single output `LABEL_0` = p(fake)). Two modes: `api` (HF_TOKEN set → HF Inference API) or `local` (transformers `pipeline`, attrs `_mode`, `_pipeline`). Both feed `_fake_probability()` (sums labels in `FAKE_LABELS`). `DeepfakeDetector(model_name=...)` lets the benchmark test any model. Fake if p(fake) > `DEEPFAKE_THRESHOLD`. **Fails closed**: API error → `DetectorUnavailable` (→ HTTP 503).
+  - `deepfake_detector.py` — model **`buildborderless/CommunityForensics-DeepfakeDet-ViT`** (switched 2026-10-08 from dima806 after benchmark; single output = logit → sigmoid = p(fake)). Three backends via `config.DEEPFAKE_BACKEND` / `backend=` arg:
+    - `onnx` (**default, production**): `backend/models/deepfake_vit_int8.onnx` (24 MB, per-channel int8 MatMul/Gemm only — Conv quantization breaks ORT CPU) run with onnxruntime; `preprocess()` reproduces the CLIPImageProcessor (shortest edge 440 bicubic, crop 384, CLIP mean/std) — matches PyTorch within 0.0055. Regenerate with `python -m scripts.export_deepfake_onnx`. Server peak RSS ~260 MB, ~80 ms/image, no torch import.
+    - `api`: HF Inference API — account is out of free credits (402), so not usable without paying.
+    - `local`: transformers pipeline (dev; `model_name=` always uses this so the benchmark can compare models).
+    All feed `_fake_probability()`. Fake if p(fake) > `DEEPFAKE_THRESHOLD`. Probabilities rounded to 6 dp. **Fails closed**: API error → `DetectorUnavailable` (→ HTTP 503).
   - `liveness_detector.py` — 6 OpenCV/MediaPipe checks (face mesh, LBP texture, FFT frequency, YCrCb color, Canny edges, Laplacian sharpness) → weighted score. `is_live = score >= 0.7`. Risk: ≥0.7 LOW, ≥0.5 MEDIUM, ≥0.3 HIGH, else CRITICAL.
   - `voice_detector.py` — HF API (`MattyB95/AST-ASVspoof2019-Synthetic-Voice-Detection`) primary; scipy spectral fallback (flatness, zero-crossing, energy variation).
   - `behavior_analyzer.py` — rule-based: typing speed/rhythm, mouse speed/straightness. Human if score ≥ 0.6.
@@ -60,7 +64,8 @@ docker-compose up --build                       # both services
   - Browser calls same-origin `/api/*` → Next.js rewrite on Netlify proxies to backend (`NEXT_PUBLIC_API_URL`).
   - `trustguard-backend.onrender.com` is a DIFFERENT, suspended service — not ours to use; render.yaml `name:` doesn't match the live one, so env vars are really managed in the Render dashboard.
   - `render.yaml` CORS now = Netlify URL (also set it in the Render dashboard).
-- **Prod deepfake check is broken (2026-10-08):** HF API returns 401 Invalid username or password (confirmed in Render logs 2026-10-08) → `/detect/deepfake/image` returns 503, sessions run without image_agent. Model `dima806/...` IS live on hf-inference, so cause = HF_TOKEN in Render (invalid/expired/missing "Inference Providers" permission/out of free credits). User must fix in Render dashboard; check Render logs for "HF image_classification failed".
+- **2026-10-08 fix: production now uses the bundled ONNX model (no HF needed).** HF_TOKEN should be REMOVED from Render (otherwise voice audio is first sent to HF, which fails anyway). Dockerfile no longer copies `.env.example` into the image (it carried a public JWT secret fallback).
+- (History) **Prod deepfake check was broken:** HF API returns 401 Invalid username or password (confirmed in Render logs 2026-10-08) → `/detect/deepfake/image` returns 503, sessions run without image_agent. Model `dima806/...` IS live on hf-inference, so cause = HF_TOKEN in Render (invalid/expired/missing "Inference Providers" permission/out of free credits). User must fix in Render dashboard; check Render logs for "HF image_classification failed".
   - Before the fail-closed fix this was hidden (every image was silently called REAL).
 - Voice model `MattyB95/AST-ASVspoof2019...` is NOT served by any HF inference provider → prod voice always uses local spectral fallback.
 - `datasets/test_images/test_face.jpg` scores liveness 0.148 (SPOOF) locally and in prod → liveness thresholds need calibration (benchmark step).
@@ -87,7 +92,7 @@ docker-compose up --build                       # both services
 
 ## Polish plan (started 2026-10-08)
 1. [x] Fix stale tests + CI branch fix (commit 42f2383). CI then caught missing `scipy` in requirements.txt.
-1b. [x] Security review & cleanup (2026-10-08): 9 vulns/bugs fixed, redundant code removed, 104 tests.
+1b. [x] Security review & cleanup (2026-10-08): 9 vulns/bugs fixed, redundant code removed, 105 tests.
 2. [x] Benchmark (2026-10-08) — dima806 failed on unseen fakes (AUC 0.41).
 2b. [x] Compared 8 hosted models (`benchmarks/MODEL_COMPARISON.md`, `--compare`), switched to CommunityForensics: AUC 0.88, acc 80%, 0% false positives; catches 100% text2img / 76% inpainting / 3% face-swap. Threshold left at 0.5 on purpose (tuning on the test set = overfitting; would need a separate validation set).
    - Live API output for this model NOT verified yet (needs working HF_TOKEN). Unit test assumes hosted API returns `[{"label": "LABEL_0", "score": p_fake}]` like the local pipeline.

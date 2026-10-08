@@ -30,6 +30,8 @@ scipy==1.11.4             # voice detector local fallback (spectral analysis)
 # ── ML (Deepfake Detection) ─────────────────
 torch==2.10.0
 transformers==5.1.0
+onnxruntime==1.20.1      # runs the bundled int8 deepfake model (default backend)
+onnx==1.17.0             # only for scripts/export_deepfake_onnx.py
 
 # ── Logging ──────────────────────────────────
 loguru==0.7.3

@@ -118,7 +118,7 @@ def test_deepfake_api_outage_raises_instead_of_guessing_real():
         def classify_image(self, path, model):
             return [{"label": "error", "score": 0}]
 
-    detector = DeepfakeDetector(hf_gateway=DownGateway())
+    detector = DeepfakeDetector(hf_gateway=DownGateway(), backend="api")
     with pytest.raises(DetectorUnavailable):
         detector.predict_image(Image.new("RGB", (32, 32)))
 
@@ -133,8 +133,8 @@ def test_api_mode_reads_single_output_model():
             return [{"label": "LABEL_0", "score": self.score}]
 
     image = Image.new("RGB", (32, 32))
-    fake = DeepfakeDetector(hf_gateway=FakeGateway(0.93)).predict_image(image)
-    real = DeepfakeDetector(hf_gateway=FakeGateway(0.02)).predict_image(image)
+    fake = DeepfakeDetector(hf_gateway=FakeGateway(0.93), backend="api").predict_image(image)
+    real = DeepfakeDetector(hf_gateway=FakeGateway(0.02), backend="api").predict_image(image)
     assert fake["is_deepfake"] and fake["probabilities"]["fake"] == 0.93
     assert not real["is_deepfake"] and real["risk_level"] == "LOW"
 

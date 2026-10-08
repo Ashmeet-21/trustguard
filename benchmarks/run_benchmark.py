@@ -185,6 +185,7 @@ def write_report(summary: dict, rows: list, seconds: float):
 
 Model: `{config.HF_IMAGE_MODEL}` · Dataset: [OpenRL/DeepFakeFace](https://huggingface.co/datasets/OpenRL/DeepFakeFace) — {summary['real']} real + {summary['fake']} fake face images,
 random sample (seed 42). The deepfake model was **not** trained on this dataset.
+Runtime: `{config.DEEPFAKE_BACKEND}` (the same one the live server uses — `onnx` = the bundled int8 model).
 How this model was chosen: [MODEL_COMPARISON.md](MODEL_COMPARISON.md).
 Reproduce: `python -m benchmarks.run_benchmark` (took {seconds:.0f}s on CPU).
 

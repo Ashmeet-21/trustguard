@@ -204,8 +204,9 @@ export default function Home() {
                 from image generators it had never seen, it caught 1 fake out of 99.
               </p>
               <p>
-                TrustGuard now uses the best of eight models tested on exactly the same images. It
-                is much better, and still not perfect: face swaps, where most of the photo is real,
+                TrustGuard now uses the best of eight models tested on exactly the same images,
+                compressed to run inside the server so photos never leave it. It is much better,
+                and still not perfect: face swaps, where most of the photo is real,
                 are almost never caught. That is why the other three checks exist.
               </p>
             </div>
@@ -235,7 +236,7 @@ export default function Home() {
                 <tr className="border-b border-rule">
                   <th scope="row" className="py-3 pr-4 font-normal text-ink">Fakes caught</th>
                   <td className="py-3 pr-4 text-right text-ink-soft">1%</td>
-                  <td className="py-3 text-right font-semibold">60%</td>
+                  <td className="py-3 text-right font-semibold">65%</td>
                 </tr>
                 <tr className="border-b border-rule">
                   <th scope="row" className="py-3 pr-4 font-normal text-ink">Real people wrongly flagged</th>
@@ -247,7 +248,7 @@ export default function Home() {
                     AUC <span className="text-ink-faint">(0.5 is guessing)</span>
                   </th>
                   <td className="py-3 pr-4 text-right text-ink-soft">0.41</td>
-                  <td className="py-3 text-right font-semibold">0.88</td>
+                  <td className="py-3 text-right font-semibold">0.87</td>
                 </tr>
                 <tr className="border-b border-rule">
                   <th scope="row" className="py-3 pr-4 font-normal text-ink">AI-generated faces caught</th>
@@ -257,7 +258,7 @@ export default function Home() {
                 <tr className="border-b border-rule">
                   <th scope="row" className="py-3 pr-4 font-normal text-ink">Face swaps caught</th>
                   <td className="py-3 pr-4 text-right text-ink-soft">0%</td>
-                  <td className="py-3 text-right font-semibold text-fail">3%</td>
+                  <td className="py-3 text-right font-semibold text-fail">6%</td>
                 </tr>
               </tbody>
             </table>

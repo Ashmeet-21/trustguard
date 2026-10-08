@@ -4,15 +4,15 @@
     "real": 100,
     "fake": 99,
     "deepfake": {
-      "accuracy": 79.9,
-      "auc": 0.882,
-      "fakes_caught_pct": 59.6,
-      "fakes_missed_pct": 40.4,
+      "accuracy": 82.4,
+      "auc": 0.866,
+      "fakes_caught_pct": 64.6,
+      "fakes_missed_pct": 35.4,
       "real_wrongly_flagged_pct": 0.0,
       "by_generator": {
         "text2img": 100.0,
-        "inpainting": 75.8,
-        "insight": 3.0
+        "inpainting": 87.9,
+        "insight": 6.1
       }
     },
     "liveness_on_real_photos": {
@@ -44,7 +44,7 @@
       "file": "wiki/11351654_1926-03-07_1953.jpg",
       "source": "wiki",
       "label": "REAL",
-      "fake_prob": 0.0,
+      "fake_prob": 0.0002,
       "predicted": "REAL",
       "liveness_score": 0.634,
       "face_detected": true
@@ -89,7 +89,7 @@
       "file": "wiki/1255496_1948-10-17_1970.jpg",
       "source": "wiki",
       "label": "REAL",
-      "fake_prob": 0.0,
+      "fake_prob": 0.002,
       "predicted": "REAL",
       "liveness_score": 0.7029,
       "face_detected": true
@@ -98,7 +98,7 @@
       "file": "wiki/13096702_1989-01-09_2014.jpg",
       "source": "wiki",
       "label": "REAL",
-      "fake_prob": 0.0063,
+      "fake_prob": 0.0062,
       "predicted": "REAL",
       "liveness_score": 0.6746,
       "face_detected": true
@@ -107,7 +107,7 @@
       "file": "wiki/13114502_1918-06-03_1994.jpg",
       "source": "wiki",
       "label": "REAL",
-      "fake_prob": 0.0,
+      "fake_prob": 0.0004,
       "predicted": "REAL",
       "liveness_score": 0.2879,
       "face_detected": false
@@ -116,7 +116,7 @@
       "file": "wiki/13247789_1993-10-27_2014.jpg",
       "source": "wiki",
       "label": "REAL",
-      "fake_prob": 0.0,
+      "fake_prob": 0.0001,
       "predicted": "REAL",
       "liveness_score": 0.6352,
       "face_detected": true
@@ -179,7 +179,7 @@
       "file": "wiki/1807556_1942-02-13_1965.jpg",
       "source": "wiki",
       "label": "REAL",
-      "fake_prob": 0.0,
+      "fake_prob": 0.0042,
       "predicted": "REAL",
       "liveness_score": 0.6535,
       "face_detected": true
@@ -215,7 +215,7 @@
       "file": "wiki/19532734_1954-06-11_2013.jpg",
       "source": "wiki",
       "label": "REAL",
-      "fake_prob": 0.0,
+      "fake_prob": 0.0002,
       "predicted": "REAL",
       "liveness_score": 0.7802,
       "face_detected": true
@@ -359,7 +359,7 @@
       "file": "wiki/26989958_1912-05-21_1940.jpg",
       "source": "wiki",
       "label": "REAL",
-      "fake_prob": 0.0,
+      "fake_prob": 0.0001,
       "predicted": "REAL",
       "liveness_score": 0.6771,
       "face_detected": true
@@ -377,7 +377,7 @@
       "file": "wiki/27649864_1990-03-16_2014.jpg",
       "source": "wiki",
       "label": "REAL",
-      "fake_prob": 0.0003,
+      "fake_prob": 0.0005,
       "predicted": "REAL",
       "liveness_score": 0.7754,
       "face_detected": true
@@ -386,7 +386,7 @@
       "file": "wiki/2815337_1929-07-31_1976.jpg",
       "source": "wiki",
       "label": "REAL",
-      "fake_prob": 0.0,
+      "fake_prob": 0.0001,
       "predicted": "REAL",
       "liveness_score": 0.6545,
       "face_detected": true
@@ -449,7 +449,7 @@
       "file": "wiki/31398216_1991-04-12_2013.jpg",
       "source": "wiki",
       "label": "REAL",
-      "fake_prob": 0.0824,
+      "fake_prob": 0.146,
       "predicted": "REAL",
       "liveness_score": 0.752,
       "face_detected": true
@@ -467,7 +467,7 @@
       "file": "wiki/322696_1960-07-19_2007.jpg",
       "source": "wiki",
       "label": "REAL",
-      "fake_prob": 0.0001,
+      "fake_prob": 0.0004,
       "predicted": "REAL",
       "liveness_score": 0.7382,
       "face_detected": true
@@ -539,7 +539,7 @@
       "file": "wiki/34614717_1985-04-11_2010.jpg",
       "source": "wiki",
       "label": "REAL",
-      "fake_prob": 0.0075,
+      "fake_prob": 0.0716,
       "predicted": "REAL",
       "liveness_score": 0.7624,
       "face_detected": true
@@ -548,7 +548,7 @@
       "file": "wiki/34645148_1992-11-11_2013.jpg",
       "source": "wiki",
       "label": "REAL",
-      "fake_prob": 0.0,
+      "fake_prob": 0.0001,
       "predicted": "REAL",
       "liveness_score": 0.7072,
       "face_detected": true
@@ -701,7 +701,7 @@
       "file": "wiki/44475209_1930-03-28_1952.jpg",
       "source": "wiki",
       "label": "REAL",
-      "fake_prob": 0.0,
+      "fake_prob": 0.0034,
       "predicted": "REAL",
       "liveness_score": 0.6541,
       "face_detected": true
@@ -710,7 +710,7 @@
       "file": "wiki/44596019_1944-08-08_2015.jpg",
       "source": "wiki",
       "label": "REAL",
-      "fake_prob": 0.0001,
+      "fake_prob": 0.0002,
       "predicted": "REAL",
       "liveness_score": 0.7729,
       "face_detected": true
@@ -719,7 +719,7 @@
       "file": "wiki/4461320_1960-12-14_2007.jpg",
       "source": "wiki",
       "label": "REAL",
-      "fake_prob": 0.032,
+      "fake_prob": 0.0723,
       "predicted": "REAL",
       "liveness_score": 0.7518,
       "face_detected": true
@@ -737,7 +737,7 @@
       "file": "wiki/46532076_1990-11-01_2014.jpg",
       "source": "wiki",
       "label": "REAL",
-      "fake_prob": 0.0003,
+      "fake_prob": 0.0023,
       "predicted": "REAL",
       "liveness_score": 0.7537,
       "face_detected": true
@@ -755,7 +755,7 @@
       "file": "wiki/475520_1930-08-14_2011.jpg",
       "source": "wiki",
       "label": "REAL",
-      "fake_prob": 0.0,
+      "fake_prob": 0.0001,
       "predicted": "REAL",
       "liveness_score": 0.7437,
       "face_detected": true
@@ -764,7 +764,7 @@
       "file": "wiki/509185_1933-03-16_2009.jpg",
       "source": "wiki",
       "label": "REAL",
-      "fake_prob": 0.0319,
+      "fake_prob": 0.0192,
       "predicted": "REAL",
       "liveness_score": 0.7989,
       "face_detected": true
@@ -791,7 +791,7 @@
       "file": "wiki/615792_1973-08-10_2014.jpg",
       "source": "wiki",
       "label": "REAL",
-      "fake_prob": 0.0008,
+      "fake_prob": 0.0088,
       "predicted": "REAL",
       "liveness_score": 0.7692,
       "face_detected": true
@@ -800,7 +800,7 @@
       "file": "wiki/63517_1908-04-05_1940.jpg",
       "source": "wiki",
       "label": "REAL",
-      "fake_prob": 0.0,
+      "fake_prob": 0.0007,
       "predicted": "REAL",
       "liveness_score": 0.7044,
       "face_detected": true
@@ -827,7 +827,7 @@
       "file": "wiki/7903579_1951-04-01_2008.jpg",
       "source": "wiki",
       "label": "REAL",
-      "fake_prob": 0.0003,
+      "fake_prob": 0.0013,
       "predicted": "REAL",
       "liveness_score": 0.7377,
       "face_detected": true
@@ -836,7 +836,7 @@
       "file": "wiki/85432_1934-12-09_2007.jpg",
       "source": "wiki",
       "label": "REAL",
-      "fake_prob": 0.0001,
+      "fake_prob": 0.0,
       "predicted": "REAL",
       "liveness_score": 0.7399,
       "face_detected": true
@@ -845,7 +845,7 @@
       "file": "wiki/864139_1930-01-04_1970.jpg",
       "source": "wiki",
       "label": "REAL",
-      "fake_prob": 0.0,
+      "fake_prob": 0.0001,
       "predicted": "REAL",
       "liveness_score": 0.6773,
       "face_detected": true
@@ -881,7 +881,7 @@
       "file": "wiki/8931898_1988-11-27_2006.jpg",
       "source": "wiki",
       "label": "REAL",
-      "fake_prob": 0.0006,
+      "fake_prob": 0.0007,
       "predicted": "REAL",
       "liveness_score": 0.3414,
       "face_detected": false
@@ -890,7 +890,7 @@
       "file": "wiki/899619_1930-12-31_1961.jpg",
       "source": "wiki",
       "label": "REAL",
-      "fake_prob": 0.0,
+      "fake_prob": 0.0001,
       "predicted": "REAL",
       "liveness_score": 0.7028,
       "face_detected": true
@@ -944,7 +944,7 @@
       "file": "text2img/150071_1965-12-31_2011.jpg",
       "source": "text2img",
       "label": "FAKE",
-      "fake_prob": 0.9998,
+      "fake_prob": 0.9997,
       "predicted": "FAKE",
       "liveness_score": 0.7031,
       "face_detected": true
@@ -953,7 +953,7 @@
       "file": "text2img/156762_1989-08-15_2010.jpg",
       "source": "text2img",
       "label": "FAKE",
-      "fake_prob": 0.9997,
+      "fake_prob": 0.9999,
       "predicted": "FAKE",
       "liveness_score": 0.7704,
       "face_detected": true
@@ -1034,7 +1034,7 @@
       "file": "text2img/3026950_1965-04-01_2012.jpg",
       "source": "text2img",
       "label": "FAKE",
-      "fake_prob": 0.953,
+      "fake_prob": 0.9878,
       "predicted": "FAKE",
       "liveness_score": 0.7486,
       "face_detected": true
@@ -1052,7 +1052,7 @@
       "file": "text2img/33109190_1982-07-17_2013.jpg",
       "source": "text2img",
       "label": "FAKE",
-      "fake_prob": 0.9963,
+      "fake_prob": 0.9999,
       "predicted": "FAKE",
       "liveness_score": 0.3237,
       "face_detected": false
@@ -1079,7 +1079,7 @@
       "file": "text2img/33298254_1976-10-29_2000.jpg",
       "source": "text2img",
       "label": "FAKE",
-      "fake_prob": 0.9997,
+      "fake_prob": 0.9999,
       "predicted": "FAKE",
       "liveness_score": 0.7978,
       "face_detected": true
@@ -1088,7 +1088,7 @@
       "file": "text2img/33440046_1989-11-30_2014.jpg",
       "source": "text2img",
       "label": "FAKE",
-      "fake_prob": 0.9996,
+      "fake_prob": 0.9999,
       "predicted": "FAKE",
       "liveness_score": 0.8076,
       "face_detected": true
@@ -1106,7 +1106,7 @@
       "file": "text2img/34408573_1992-06-11_2015.jpg",
       "source": "text2img",
       "label": "FAKE",
-      "fake_prob": 0.9959,
+      "fake_prob": 0.9921,
       "predicted": "FAKE",
       "liveness_score": 0.6983,
       "face_detected": true
@@ -1124,7 +1124,7 @@
       "file": "text2img/38894624_1994-01-23_2013.jpg",
       "source": "text2img",
       "label": "FAKE",
-      "fake_prob": 0.9997,
+      "fake_prob": 0.9999,
       "predicted": "FAKE",
       "liveness_score": 0.7132,
       "face_detected": true
@@ -1133,7 +1133,7 @@
       "file": "text2img/42403407_1990-05-17_2011.jpg",
       "source": "text2img",
       "label": "FAKE",
-      "fake_prob": 0.9914,
+      "fake_prob": 0.9992,
       "predicted": "FAKE",
       "liveness_score": 0.6583,
       "face_detected": true
@@ -1187,7 +1187,7 @@
       "file": "text2img/7762264_1979-02-01_2013.jpg",
       "source": "text2img",
       "label": "FAKE",
-      "fake_prob": 0.9233,
+      "fake_prob": 0.9874,
       "predicted": "FAKE",
       "liveness_score": 0.747,
       "face_detected": true
@@ -1196,7 +1196,7 @@
       "file": "text2img/9202752_1955-04-26_1995.jpg",
       "source": "text2img",
       "label": "FAKE",
-      "fake_prob": 0.9862,
+      "fake_prob": 0.9982,
       "predicted": "FAKE",
       "liveness_score": 0.6503,
       "face_detected": true
@@ -1223,7 +1223,7 @@
       "file": "inpainting/11774430_1953-11-29_2008.jpg",
       "source": "inpainting",
       "label": "FAKE",
-      "fake_prob": 0.1048,
+      "fake_prob": 0.4526,
       "predicted": "REAL",
       "liveness_score": 0.7794,
       "face_detected": true
@@ -1232,7 +1232,7 @@
       "file": "inpainting/12014072_1970-06-04_2005.jpg",
       "source": "inpainting",
       "label": "FAKE",
-      "fake_prob": 0.9993,
+      "fake_prob": 0.9997,
       "predicted": "FAKE",
       "liveness_score": 0.7464,
       "face_detected": true
@@ -1241,7 +1241,7 @@
       "file": "inpainting/1427330_1960-07-10_1981.jpg",
       "source": "inpainting",
       "label": "FAKE",
-      "fake_prob": 0.0318,
+      "fake_prob": 0.0258,
       "predicted": "REAL",
       "liveness_score": 0.785,
       "face_detected": true
@@ -1250,7 +1250,7 @@
       "file": "inpainting/14711173_1985-05-12_2013.jpg",
       "source": "inpainting",
       "label": "FAKE",
-      "fake_prob": 0.9996,
+      "fake_prob": 1.0,
       "predicted": "FAKE",
       "liveness_score": 0.3389,
       "face_detected": false
@@ -1259,7 +1259,7 @@
       "file": "inpainting/1535727_1983-03-10_2012.jpg",
       "source": "inpainting",
       "label": "FAKE",
-      "fake_prob": 0.9987,
+      "fake_prob": 0.9999,
       "predicted": "FAKE",
       "liveness_score": 0.7322,
       "face_detected": true
@@ -1277,7 +1277,7 @@
       "file": "inpainting/18504248_1991-09-23_2014.jpg",
       "source": "inpainting",
       "label": "FAKE",
-      "fake_prob": 1.0,
+      "fake_prob": 0.9999,
       "predicted": "FAKE",
       "liveness_score": 0.771,
       "face_detected": true
@@ -1286,7 +1286,7 @@
       "file": "inpainting/2508252_1985-03-16_2013.jpg",
       "source": "inpainting",
       "label": "FAKE",
-      "fake_prob": 0.9362,
+      "fake_prob": 0.9814,
       "predicted": "FAKE",
       "liveness_score": 0.7636,
       "face_detected": true
@@ -1295,8 +1295,8 @@
       "file": "inpainting/25628529_1987-07-29_2009.jpg",
       "source": "inpainting",
       "label": "FAKE",
-      "fake_prob": 0.1387,
-      "predicted": "REAL",
+      "fake_prob": 0.5192,
+      "predicted": "FAKE",
       "liveness_score": 0.7111,
       "face_detected": true
     },
@@ -1304,7 +1304,7 @@
       "file": "inpainting/27598409_1974-08-28_2011.jpg",
       "source": "inpainting",
       "label": "FAKE",
-      "fake_prob": 0.946,
+      "fake_prob": 0.9724,
       "predicted": "FAKE",
       "liveness_score": 0.7279,
       "face_detected": true
@@ -1313,7 +1313,7 @@
       "file": "inpainting/31485462_2011-01-08_2012.jpg",
       "source": "inpainting",
       "label": "FAKE",
-      "fake_prob": 0.9267,
+      "fake_prob": 0.9921,
       "predicted": "FAKE",
       "liveness_score": 0.7815,
       "face_detected": true
@@ -1322,8 +1322,8 @@
       "file": "inpainting/31919029_1995-04-12_2008.jpg",
       "source": "inpainting",
       "label": "FAKE",
-      "fake_prob": 0.4236,
-      "predicted": "REAL",
+      "fake_prob": 0.9031,
+      "predicted": "FAKE",
       "liveness_score": 0.7034,
       "face_detected": true
     },
@@ -1331,7 +1331,7 @@
       "file": "inpainting/33983305_1976-04-30_2009.jpg",
       "source": "inpainting",
       "label": "FAKE",
-      "fake_prob": 0.9306,
+      "fake_prob": 0.9874,
       "predicted": "FAKE",
       "liveness_score": 0.7664,
       "face_detected": true
@@ -1340,7 +1340,7 @@
       "file": "inpainting/3544825_1970-03-28_2013.jpg",
       "source": "inpainting",
       "label": "FAKE",
-      "fake_prob": 0.0287,
+      "fake_prob": 0.0027,
       "predicted": "REAL",
       "liveness_score": 0.7155,
       "face_detected": true
@@ -1349,7 +1349,7 @@
       "file": "inpainting/35727198_1988-05-17_2012.jpg",
       "source": "inpainting",
       "label": "FAKE",
-      "fake_prob": 0.9999,
+      "fake_prob": 1.0,
       "predicted": "FAKE",
       "liveness_score": 0.733,
       "face_detected": true
@@ -1358,7 +1358,7 @@
       "file": "inpainting/3686525_1946-06-26_2007.jpg",
       "source": "inpainting",
       "label": "FAKE",
-      "fake_prob": 0.9999,
+      "fake_prob": 1.0,
       "predicted": "FAKE",
       "liveness_score": 0.7275,
       "face_detected": true
@@ -1367,7 +1367,7 @@
       "file": "inpainting/38001451_1985-08-06_2013.jpg",
       "source": "inpainting",
       "label": "FAKE",
-      "fake_prob": 0.9904,
+      "fake_prob": 0.9989,
       "predicted": "FAKE",
       "liveness_score": 0.7475,
       "face_detected": true
@@ -1385,7 +1385,7 @@
       "file": "inpainting/38580758_1954-01-14_2010.jpg",
       "source": "inpainting",
       "label": "FAKE",
-      "fake_prob": 0.8251,
+      "fake_prob": 0.9763,
       "predicted": "FAKE",
       "liveness_score": 0.7255,
       "face_detected": true
@@ -1394,7 +1394,7 @@
       "file": "inpainting/39106755_1976-08-01_2013.jpg",
       "source": "inpainting",
       "label": "FAKE",
-      "fake_prob": 0.9884,
+      "fake_prob": 0.9991,
       "predicted": "FAKE",
       "liveness_score": 0.8187,
       "face_detected": true
@@ -1403,7 +1403,7 @@
       "file": "inpainting/40229958_1967-08-10_2014.jpg",
       "source": "inpainting",
       "label": "FAKE",
-      "fake_prob": 0.9934,
+      "fake_prob": 0.9962,
       "predicted": "FAKE",
       "liveness_score": 0.7908,
       "face_detected": true
@@ -1421,7 +1421,7 @@
       "file": "inpainting/442631_1971-09-28_2010.jpg",
       "source": "inpainting",
       "label": "FAKE",
-      "fake_prob": 0.8814,
+      "fake_prob": 0.9853,
       "predicted": "FAKE",
       "liveness_score": 0.342,
       "face_detected": false
@@ -1430,7 +1430,7 @@
       "file": "inpainting/44706021_1977-04-12_2014.jpg",
       "source": "inpainting",
       "label": "FAKE",
-      "fake_prob": 0.9944,
+      "fake_prob": 0.9779,
       "predicted": "FAKE",
       "liveness_score": 0.7709,
       "face_detected": true
@@ -1439,7 +1439,7 @@
       "file": "inpainting/45513588_1956-12-07_2015.jpg",
       "source": "inpainting",
       "label": "FAKE",
-      "fake_prob": 0.7605,
+      "fake_prob": 0.936,
       "predicted": "FAKE",
       "liveness_score": 0.7745,
       "face_detected": true
@@ -1448,7 +1448,7 @@
       "file": "inpainting/670098_1974-07-29_2009.jpg",
       "source": "inpainting",
       "label": "FAKE",
-      "fake_prob": 0.7054,
+      "fake_prob": 0.9347,
       "predicted": "FAKE",
       "liveness_score": 0.7307,
       "face_detected": true
@@ -1457,8 +1457,8 @@
       "file": "inpainting/6907621_1984-07-03_2013.jpg",
       "source": "inpainting",
       "label": "FAKE",
-      "fake_prob": 0.1937,
-      "predicted": "REAL",
+      "fake_prob": 0.5382,
+      "predicted": "FAKE",
       "liveness_score": 0.7561,
       "face_detected": true
     },
@@ -1466,8 +1466,8 @@
       "file": "inpainting/6989736_1947-11-23_1968.jpg",
       "source": "inpainting",
       "label": "FAKE",
-      "fake_prob": 0.0613,
-      "predicted": "REAL",
+      "fake_prob": 0.9057,
+      "predicted": "FAKE",
       "liveness_score": 0.2882,
       "face_detected": false
     },
@@ -1475,7 +1475,7 @@
       "file": "inpainting/7019717_1982-03-17_2010.jpg",
       "source": "inpainting",
       "label": "FAKE",
-      "fake_prob": 0.786,
+      "fake_prob": 0.9948,
       "predicted": "FAKE",
       "liveness_score": 0.7853,
       "face_detected": true
@@ -1493,7 +1493,7 @@
       "file": "inpainting/79505_1928-04-02_1981.jpg",
       "source": "inpainting",
       "label": "FAKE",
-      "fake_prob": 0.0029,
+      "fake_prob": 0.0212,
       "predicted": "REAL",
       "liveness_score": 0.6998,
       "face_detected": true
@@ -1511,7 +1511,7 @@
       "file": "inpainting/983578_1951-07-05_2009.jpg",
       "source": "inpainting",
       "label": "FAKE",
-      "fake_prob": 0.9999,
+      "fake_prob": 1.0,
       "predicted": "FAKE",
       "liveness_score": 0.7078,
       "face_detected": true
@@ -1520,7 +1520,7 @@
       "file": "insight/10804507_1986-06-19_2014.jpg",
       "source": "insight",
       "label": "FAKE",
-      "fake_prob": 0.0003,
+      "fake_prob": 0.0009,
       "predicted": "REAL",
       "liveness_score": 0.767,
       "face_detected": true
@@ -1565,7 +1565,7 @@
       "file": "insight/177840_1970-07-30_2013.jpg",
       "source": "insight",
       "label": "FAKE",
-      "fake_prob": 0.0007,
+      "fake_prob": 0.0044,
       "predicted": "REAL",
       "liveness_score": 0.7821,
       "face_detected": true
@@ -1574,7 +1574,7 @@
       "file": "insight/17843964_1942-11-10_1962.jpg",
       "source": "insight",
       "label": "FAKE",
-      "fake_prob": 0.9666,
+      "fake_prob": 0.9927,
       "predicted": "FAKE",
       "liveness_score": 0.774,
       "face_detected": true
@@ -1610,7 +1610,7 @@
       "file": "insight/2457570_1983-06-20_2011.jpg",
       "source": "insight",
       "label": "FAKE",
-      "fake_prob": 0.0005,
+      "fake_prob": 0.0009,
       "predicted": "REAL",
       "liveness_score": 0.7208,
       "face_detected": true
@@ -1646,7 +1646,7 @@
       "file": "insight/288008_1947-01-06_1972.jpg",
       "source": "insight",
       "label": "FAKE",
-      "fake_prob": 0.0,
+      "fake_prob": 0.0001,
       "predicted": "REAL",
       "liveness_score": 0.7466,
       "face_detected": true
@@ -1655,7 +1655,7 @@
       "file": "insight/28978215_1976-11-23_2012.jpg",
       "source": "insight",
       "label": "FAKE",
-      "fake_prob": 0.0004,
+      "fake_prob": 0.0097,
       "predicted": "REAL",
       "liveness_score": 0.7574,
       "face_detected": true
@@ -1664,7 +1664,7 @@
       "file": "insight/30672313_1955-03-16_2010.jpg",
       "source": "insight",
       "label": "FAKE",
-      "fake_prob": 0.0104,
+      "fake_prob": 0.0107,
       "predicted": "REAL",
       "liveness_score": 0.7828,
       "face_detected": true
@@ -1673,7 +1673,7 @@
       "file": "insight/30701570_1966-05-12_2010.jpg",
       "source": "insight",
       "label": "FAKE",
-      "fake_prob": 0.1621,
+      "fake_prob": 0.0949,
       "predicted": "REAL",
       "liveness_score": 0.7554,
       "face_detected": true
@@ -1691,7 +1691,7 @@
       "file": "insight/35431308_1994-05-18_2014.jpg",
       "source": "insight",
       "label": "FAKE",
-      "fake_prob": 0.0001,
+      "fake_prob": 0.0,
       "predicted": "REAL",
       "liveness_score": 0.7898,
       "face_detected": true
@@ -1700,7 +1700,7 @@
       "file": "insight/36348027_1993-05-17_2012.jpg",
       "source": "insight",
       "label": "FAKE",
-      "fake_prob": 0.0063,
+      "fake_prob": 0.0024,
       "predicted": "REAL",
       "liveness_score": 0.7765,
       "face_detected": true
@@ -1718,7 +1718,7 @@
       "file": "insight/3907967_1950-09-27_2007.jpg",
       "source": "insight",
       "label": "FAKE",
-      "fake_prob": 0.0005,
+      "fake_prob": 0.0007,
       "predicted": "REAL",
       "liveness_score": 0.7621,
       "face_detected": true
@@ -1727,7 +1727,7 @@
       "file": "insight/44068566_1926-07-01_1950.jpg",
       "source": "insight",
       "label": "FAKE",
-      "fake_prob": 0.0,
+      "fake_prob": 0.0003,
       "predicted": "REAL",
       "liveness_score": 0.7199,
       "face_detected": true
@@ -1745,7 +1745,7 @@
       "file": "insight/5654852_1963-02-24_2010.jpg",
       "source": "insight",
       "label": "FAKE",
-      "fake_prob": 0.0001,
+      "fake_prob": 0.0,
       "predicted": "REAL",
       "liveness_score": 0.3282,
       "face_detected": false
@@ -1763,7 +1763,7 @@
       "file": "insight/6054095_1915-12-15_1963.jpg",
       "source": "insight",
       "label": "FAKE",
-      "fake_prob": 0.0019,
+      "fake_prob": 0.0108,
       "predicted": "REAL",
       "liveness_score": 0.7819,
       "face_detected": true
@@ -1781,7 +1781,7 @@
       "file": "insight/70854_1960-07-07_1996.jpg",
       "source": "insight",
       "label": "FAKE",
-      "fake_prob": 0.0001,
+      "fake_prob": 0.0,
       "predicted": "REAL",
       "liveness_score": 0.7459,
       "face_detected": true
@@ -1799,8 +1799,8 @@
       "file": "insight/8414164_1985-06-20_2011.jpg",
       "source": "insight",
       "label": "FAKE",
-      "fake_prob": 0.0769,
-      "predicted": "REAL",
+      "fake_prob": 0.5605,
+      "predicted": "FAKE",
       "liveness_score": 0.8176,
       "face_detected": true
     },
@@ -1808,7 +1808,7 @@
       "file": "insight/9096439_1987-01-06_2006.jpg",
       "source": "insight",
       "label": "FAKE",
-      "fake_prob": 0.0,
+      "fake_prob": 0.0004,
       "predicted": "REAL",
       "liveness_score": 0.7184,
       "face_detected": true

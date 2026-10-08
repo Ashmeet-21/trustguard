@@ -74,8 +74,8 @@ export default function LoginPage() {
         </h1>
         <p className="mt-4 text-ink-soft">
           An account keeps your verification records private to you. Your selfie and voice sample are
-          deleted from TrustGuard’s server as soon as the checks finish, and only the scores and
-          decision are kept. The face check sends your selfie to a model hosted on HuggingFace.
+          checked on TrustGuard’s own server and deleted as soon as the checks finish. Only the
+          scores and the decision are kept.
         </p>
       </div>
 

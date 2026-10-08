@@ -24,15 +24,22 @@ it was **not** trained on (100 real photos + 99 fakes from Stable Diffusion text
 InsightFace face swap). It caught **1 of 99** fakes (AUC 0.41 — worse than guessing), even though a sanity
 check on images like its training data scored 100/100. The pipeline was fine; the model didn't generalize.
 
-So I benchmarked **8 pretrained models** on the same images and switched to the best one:
+So I benchmarked **8 pretrained models** on the same images, switched to the best one, and then moved it
+from a paid API into the server itself as a quantized ONNX model:
 
-| | Original model | **Current model** (CommunityForensics ViT) |
-|---|---|---|
-| AUC (0.5 = guessing, 1.0 = perfect) | 0.41 | **0.88** |
-| Accuracy | 50% | **80%** |
-| Fakes caught | 1% | **60%** |
-| Real people wrongly flagged | 1% | **0%** |
-| Caught by generator: text-to-image / inpainting / face swap | 3% / 0% / 0% | **100% / 76% / 3%** |
+| | Original model | Best model (PyTorch) | **Deployed: same model, int8 ONNX** |
+|---|---|---|---|
+| AUC (0.5 = guessing, 1.0 = perfect) | 0.41 | 0.88 | **0.87** |
+| Accuracy | 50% | 80% | **82%** |
+| Fakes caught | 1% | 60% | **65%** |
+| Real people wrongly flagged | 1% | 0% | **0%** |
+| Caught: text-to-image / inpainting / face swap | 3% / 0% / 0% | 100% / 76% / 3% | **100% / 88% / 6%** |
+| Model size, runtime | — | 88 MB, PyTorch | **24 MB, onnxruntime** |
+
+**Why ONNX:** the hosted HuggingFace API needs paid credits (it returned `402 Payment Required`), and
+PyTorch is too big for a 512 MB free server. The int8 ONNX model runs in ~80 ms on CPU, the whole server
+peaks at ~260 MB, and selfies never leave the server. Quantization didn't hurt accuracy — see the table.
+Reproduce the export with `python -m scripts.export_deepfake_onnx`.
 
 **Remaining weakness:** face swaps are almost never caught — most of the pixels are a genuine photo.
 That's why TrustGuard doesn't rely on one check: liveness, voice, behavior and the quality gates still apply,
@@ -214,7 +221,7 @@ Runs both backend (port 8000) and frontend (port 3000).
 ## Running Tests
 
 ```bash
-# All 104 tests
+# All 105 tests
 pytest tests/ -v
 
 # By module
@@ -335,7 +342,7 @@ trustguard/
 │   │       └── Providers.tsx          # Client-side provider wrapper
 │   ├── next.config.ts                # API proxy rewrites
 │   └── package.json
-├── tests/                            # 104 tests (17 test files)
+├── tests/                            # 105 tests (17 test files)
 ├── Dockerfile                        # Backend container
 ├── docker-compose.yml                # Full-stack orchestration
 ├── requirements.txt                  # Python dependencies
@@ -351,14 +358,14 @@ trustguard/
 | Backend API | FastAPI | Async, auto-generated docs, Pydantic validation |
 | Frontend | Next.js 16 + React 19 | App router, TypeScript, server components |
 | Styling | Tailwind CSS v4 | Dark theme with cyan→purple gradient accents |
-| Deepfake Detection | PyTorch + HuggingFace ViT | Pretrained model — see [benchmark](benchmarks/RESULTS.md) for real-world accuracy |
+| Deepfake Detection | ViT exported to int8 ONNX, run with onnxruntime | Picked by [benchmark](benchmarks/MODEL_COMPARISON.md); 24 MB, no PyTorch or paid API in production |
 | Liveness Detection | OpenCV + MediaPipe | Lightweight, no GPU needed, 6 explainable checks |
 | Voice Detection | HuggingFace API + scipy | API primary, local spectral fallback |
 | Behavioral Analysis | NumPy | Pure rule-based, no training data needed |
 | Auth | python-jose + passlib | JWT tokens, bcrypt password hashing |
 | Database | SQLAlchemy + SQLite | Zero setup, swappable to PostgreSQL |
 | Rate Limiting | slowapi | Per-IP request throttling |
-| Testing | pytest | 104 tests covering detectors, API, orchestration, security |
+| Testing | pytest | 105 tests covering detectors, API, orchestration, security |
 | Logging | Loguru | Structured logging with rotation |
 
 ---

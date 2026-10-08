@@ -1,16 +1,21 @@
 """
-Deepfake Detector Module
+Deepfake Detector Module — three ways to run the same model (config.DEEPFAKE_BACKEND):
 
-API mode (HF_TOKEN set):   calls HF Inference API — no torch needed, works on 512MB RAM
-Local mode (no HF_TOKEN):  runs the same model locally with transformers (dev/local only)
+  onnx   (default)  int8 ONNX file shipped in backend/models/, run with onnxruntime.
+                    No PyTorch, no external API, no credits — fits Render's free 512MB plan,
+                    and selfies never leave the server. Made by scripts/export_deepfake_onnx.py.
+  api               HF Inference API (needs HF_TOKEN and paid credits).
+  local             transformers + PyTorch (dev, and for benchmarking other models).
 
-Model: config.HF_IMAGE_MODEL — default buildborderless/CommunityForensics-DeepfakeDet-ViT.
+Model: buildborderless/CommunityForensics-DeepfakeDet-ViT.
 Chosen by benchmarks/run_benchmark.py --compare: best of 8 models on fakes it had never seen
 (AUC 0.88, 0% real photos wrongly flagged). See benchmarks/MODEL_COMPARISON.md.
 """
 
 import tempfile
 import os
+from pathlib import Path
+
 import numpy as np
 from PIL import Image
 from loguru import logger
@@ -24,26 +29,59 @@ from backend.utils import config
 # (CommunityForensics has a single output, LABEL_0 = probability the image is fake.)
 FAKE_LABELS = {"fake", "deepfake", "ai", "artificial", "label_0"}
 
+ONNX_PATH = Path(__file__).parent.parent / "models" / "deepfake_vit_int8.onnx"
+
+# Pre-processing used by the model (from its CLIPImageProcessor config)
+RESIZE_SHORTEST_EDGE = 440
+CROP_SIZE = 384
+CLIP_MEAN = np.array([0.48145466, 0.4578275, 0.40821073], dtype=np.float32)
+CLIP_STD = np.array([0.26862954, 0.26130258, 0.27577711], dtype=np.float32)
+
+
+def preprocess(image: Image.Image) -> np.ndarray:
+    """PIL image -> (1, 3, 384, 384) float32 array, matching the model's own processor:
+    resize shortest edge to 440 (bicubic), centre-crop 384, scale to 0..1, normalise."""
+    w, h = image.size
+    scale = RESIZE_SHORTEST_EDGE / min(w, h)
+    image = image.resize((max(CROP_SIZE, int(w * scale)), max(CROP_SIZE, int(h * scale))), Image.BICUBIC)
+    left = (image.width - CROP_SIZE) // 2
+    top = (image.height - CROP_SIZE) // 2
+    image = image.crop((left, top, left + CROP_SIZE, top + CROP_SIZE))
+    pixels = (np.asarray(image, dtype=np.float32) / 255.0 - CLIP_MEAN) / CLIP_STD
+    return pixels.transpose(2, 0, 1)[np.newaxis]  # HWC -> NCHW
+
 
 class DeepfakeDetector:
-    """
-    Deepfake Detection using a pretrained Vision Transformer (ViT).
+    """Deepfake Detection using a pretrained Vision Transformer (ViT)."""
 
-    In production (HF_TOKEN set), inference goes through the HF Inference API.
-    Locally, it runs the model with transformers for offline use.
-    """
-
-    def __init__(self, device: str = None, hf_gateway=None, model_name: str = None):
+    def __init__(self, device: str = None, hf_gateway=None, model_name: str = None, backend: str = None):
         self.model_name = model_name or config.HF_IMAGE_MODEL
         self._hf_gateway = hf_gateway
         self._pipeline = None
+        self._session = None
 
-        if hf_gateway and hf_gateway.client:
+        # Comparing a different model (benchmark) always runs it locally with transformers
+        backend = "local" if model_name else (backend or config.DEEPFAKE_BACKEND)
+
+        if backend == "onnx" and ONNX_PATH.exists():
+            self._mode = "onnx"
+            self._load_onnx()
+        elif backend == "api" and hf_gateway and hf_gateway.client:
             self._mode = "api"
             logger.info("DeepfakeDetector: HF Inference API mode (model={})", self.model_name)
         else:
+            if backend != "local":
+                logger.warning("DeepfakeDetector: '{}' backend unavailable, falling back to local transformers", backend)
             self._mode = "local"
             self._load_local_model(device)
+
+    def _load_onnx(self):
+        import onnxruntime as ort
+
+        options = ort.SessionOptions()
+        options.intra_op_num_threads = 2  # small server — keep memory and CPU use modest
+        self._session = ort.InferenceSession(str(ONNX_PATH), options, providers=["CPUExecutionProvider"])
+        logger.info("DeepfakeDetector: ONNX mode ({}, {:.1f} MB)", ONNX_PATH.name, ONNX_PATH.stat().st_size / 1e6)
 
     def _load_local_model(self, device):
         """Load the model locally (dev fallback). The pipeline handles preprocessing + softmax/sigmoid."""
@@ -56,7 +94,10 @@ class DeepfakeDetector:
 
     def predict_image(self, image_input: Union[str, Image.Image, np.ndarray]) -> Dict:
         """Predict if an image is a deepfake. Accepts path, PIL Image, or numpy array (BGR)."""
-        if self._mode == "api":
+        if self._mode == "onnx":
+            logit = self._session.run(None, {"pixel_values": preprocess(self._to_pil(image_input))})[0][0][0]
+            results = [{"label": "LABEL_0", "score": float(1 / (1 + np.exp(-logit)))}]  # sigmoid -> p(fake)
+        elif self._mode == "api":
             results = self._classify_api(image_input)
         else:
             results = self._pipeline(self._to_pil(image_input))
@@ -109,9 +150,10 @@ class DeepfakeDetector:
         return {
             "is_deepfake": bool(is_deepfake),
             "confidence": float(round(confidence, 4)),
+            # 6 decimals: many real photos score ~0.0000x — rounding to 4 turns them into ties
             "probabilities": {
-                "real": float(round(real_prob, 4)),
-                "fake": float(round(fake_prob, 4)),
+                "real": float(round(real_prob, 6)),
+                "fake": float(round(fake_prob, 6)),
             },
             "classification": "FAKE" if is_deepfake else "REAL",
             "risk_level": self._get_risk_level(fake_prob),

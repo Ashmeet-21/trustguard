@@ -47,6 +47,8 @@ ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30")
 # HuggingFace Inference API
 HF_TOKEN = os.getenv("HF_TOKEN", "")
 HF_VOICE_MODEL = os.getenv("HF_VOICE_MODEL", "MattyB95/AST-ASVspoof2019-Synthetic-Voice-Detection")
+# How to run the deepfake model: onnx (default, bundled, free) | api (HF Inference, needs credits) | local (PyTorch)
+DEEPFAKE_BACKEND = os.getenv("DEEPFAKE_BACKEND", "onnx").lower()
 # Chosen by benchmark (benchmarks/MODEL_COMPARISON.md): best of 8 models on unseen fakes
 HF_IMAGE_MODEL = os.getenv("HF_IMAGE_MODEL", "buildborderless/CommunityForensics-DeepfakeDet-ViT")
 

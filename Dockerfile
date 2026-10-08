@@ -23,9 +23,9 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Copy application code
 COPY backend/ backend/
 
-# Create logs dir and stub env (real secrets injected via Render env vars at runtime)
+# Create logs dir. No .env is copied in: settings come from the host's environment variables,
+# and a missing JWT_SECRET_KEY falls back to a random secret — never the public example value.
 RUN mkdir -p logs
-COPY .env.example .env
 
 EXPOSE 8000
 

@@ -13,11 +13,18 @@ def detector():
 
 
 def test_detector_initializes(detector):
-    """Detector should initialize successfully on CPU."""
+    """By default the detector runs the bundled int8 ONNX model (what production uses)."""
     assert detector is not None
-    assert detector._mode == "local"
-    assert detector._pipeline is not None
-    assert detector._pipeline.device.type == "cpu"
+    assert detector._mode == "onnx"
+    assert detector._session is not None
+
+
+def test_local_pytorch_backend_still_works():
+    """The transformers/PyTorch backend (dev + benchmarking) gives a valid result too."""
+    local = DeepfakeDetector(backend="local")
+    assert local._mode == "local"
+    result = local.predict_image(Image.new("RGB", (300, 400), (180, 150, 130)))
+    assert 0.0 <= result["probabilities"]["fake"] <= 1.0
 
 
 def test_predict_from_pil_image(detector):
