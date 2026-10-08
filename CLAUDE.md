@@ -64,13 +64,13 @@ docker-compose up --build                       # both services
   - Browser calls same-origin `/api/*` → Next.js rewrite on Netlify proxies to backend (`NEXT_PUBLIC_API_URL`).
   - `trustguard-backend.onrender.com` is a DIFFERENT, suspended service — not ours to use; render.yaml `name:` doesn't match the live one, so env vars are really managed in the Render dashboard.
   - `render.yaml` CORS now = Netlify URL (also set it in the Render dashboard).
-- **2026-10-08 fix: production now uses the bundled ONNX model (no HF needed).** HF_TOKEN should be REMOVED from Render (otherwise voice audio is first sent to HF, which fails anyway). Dockerfile no longer copies `.env.example` into the image (it carried a public JWT secret fallback).
-- (History) **Prod deepfake check was broken:** HF API returns 401 Invalid username or password (confirmed in Render logs 2026-10-08) → `/detect/deepfake/image` returns 503, sessions run without image_agent. Model `dima806/...` IS live on hf-inference, so cause = HF_TOKEN in Render (invalid/expired/missing "Inference Providers" permission/out of free credits). User must fix in Render dashboard; check Render logs for "HF image_classification failed".
-  - Before the fail-closed fix this was hidden (every image was silently called REAL).
-- Voice model `MattyB95/AST-ASVspoof2019...` is NOT served by any HF inference provider → prod voice always uses local spectral fallback.
-- `datasets/test_images/test_face.jpg` scores liveness 0.148 (SPOOF) locally and in prod → liveness thresholds need calibration (benchmark step).
+- **Production uses the bundled int8 ONNX model — no HuggingFace needed** (commit 2046cb9). Verified live 2026-10-08: real photo → REAL (p_fake 0.00001), AI face → FAKE (0.99998), ~2.5 s/check on Render's CPU; full session via Netlify → PASS, trust 89. User removed HF_TOKEN from Render (2026-10-08). Voice step not yet tested live with a real mic — user to do one full run.
+  - History: the HF API failed with 401 (bad token) then 402 (free credits used up) → face check returned 503. Before the fail-closed fix, this was hidden (every image silently called REAL).
+  - Dockerfile no longer copies `.env.example` into the image (it carried a public JWT secret fallback).
+- Voice model `MattyB95/AST-ASVspoof2019...` is NOT served by any HF inference provider → voice always uses the local spectral fallback.
+- `datasets/test_images/test_face.jpg` scores liveness 0.148 (SPOOF) locally and in prod → liveness thresholds need calibration.
 - GitHub repo homepage + topics set; README has live links + real CI badge.
-- CI: `.github/workflows/ci.yml` — fixed 2026-10-08 to trigger on `master` (was `main`, so it had never run). Not yet confirmed green on GitHub.
+- CI: `.github/workflows/ci.yml` triggers on `master`; green on every push since 2026-10-08 (105 tests).
 
 ## Known gotchas
 - bcrypt must be pinned `4.1.3` (5.x breaks passlib).
@@ -79,24 +79,25 @@ docker-compose up --build                       # both services
 - mediapipe 0.10.9 pulls opencv-contrib — don't add opencv separately in prod reqs.
 
 ## Honest gaps (say this in interviews, don't hide it)
-- **Benchmark done 2026-10-08** (`benchmarks/run_benchmark.py`, results in `benchmarks/RESULTS.md`): on DeepFakeFace (unseen generators) the deepfake model catches 1/99 fakes, AUC 0.405 (worse than guessing). Sanity check on its training-style data (Hemg/deepfake-and-real-images): 100/100 → our pipeline is correct, the model doesn't generalize. All "99%" claims removed from README + landing page.
-  - Script reads remote zips via `HfFileSystem` (downloads only sampled images to gitignored `datasets/deepfakeface/`). pyarrow installed in venv only for the one-off sanity check (not in requirements).
-- Liveness/voice/behavior thresholds are hand-tuned; liveness tested on 1 image (`datasets/test_images/test_face.jpg`).
-- False positive / negative rates unknown.
+- **Face model is benchmarked** (`benchmarks/`, DeepFakeFace, 100 real + 99 fake, seed 42): original dima806 caught 1/99 (AUC 0.41; 100/100 on its training-style data → pipeline fine, model didn't generalize). Deployed model (CommunityForensics ViT-Small, int8 ONNX): **AUC 0.87, accuracy 82%, 65% of fakes caught, 0% false positives**; text2img 100% / inpainting 88% / face swap 6%. PyTorch original of same model: 0.88 / 80% / 60% / 0%. Threshold kept at default 0.5 on purpose (tuning on the test set = cheating).
+  - Script reads remote zips via `HfFileSystem` (only sampled images downloaded to gitignored `datasets/deepfakeface/`). pyarrow/psutil installed in venv only for one-off checks (not in requirements).
+- 199 images is a small test set — enough to disprove the 99% claim, not a full evaluation.
+- Liveness/voice/behaviour thresholds and risk weights (30/25/25/20) are hand-set; liveness and voice are NOT validated against any spoof dataset.
 
 ## Known limitations (not fixed yet)
 - Routes are `async def` but call blocking ML inference → one slow request blocks the server. Fix = sync `def` routes, BUT mediapipe FaceMesh isn't thread-safe, so needs a lock first.
 - Rate limiter + sessions + replay hashes are in-memory → reset on restart, don't work across multiple workers (would need Redis).
-- `render.yaml` has `CORS_ORIGINS="*"` → set to the real Netlify URL once deployed.
 - KYC endpoint has its own verdict rules separate from the risk engine (can disagree with trust_score).
 
 ## Polish plan (started 2026-10-08)
 1. [x] Fix stale tests + CI branch fix (commit 42f2383). CI then caught missing `scipy` in requirements.txt.
-1b. [x] Security review & cleanup (2026-10-08): 9 vulns/bugs fixed, redundant code removed, 105 tests.
-2. [x] Benchmark (2026-10-08) — dima806 failed on unseen fakes (AUC 0.41).
-2b. [x] Compared 8 hosted models (`benchmarks/MODEL_COMPARISON.md`, `--compare`), switched to CommunityForensics: AUC 0.88, acc 80%, 0% false positives; catches 100% text2img / 76% inpainting / 3% face-swap. Threshold left at 0.5 on purpose (tuning on the test set = overfitting; would need a separate validation set).
-   - Live API output for this model NOT verified yet (needs working HF_TOKEN). Unit test assumes hosted API returns `[{"label": "LABEL_0", "score": p_fake}]` like the local pipeline.
-3. [ ] Live demo (Render + Netlify), add URL to README + GitHub website field, add repo topics.
-4. [ ] README rewrite: demo link + GIF at top, results table, "Limitations & next steps", drop "99%" as own claim.
-5. [ ] Cleanups: CORS lock, root `test_setup.py`.
-6. [ ] Walk user through backend file by file (risk_engine → quality_gates → behavior → orchestrator → detectors).
+1b. [x] Security review & cleanup (2026-10-08): 10 vulns/bugs fixed (incl. Docker public JWT secret), redundant code removed.
+2. [x] Benchmark — dima806 failed on unseen fakes (AUC 0.41).
+2b. [x] Compared 8 models (`benchmarks/MODEL_COMPARISON.md`, `--compare`), switched to CommunityForensics ViT-Small.
+2c. [x] Moved inference into the server as int8 ONNX (24 MB, ~260 MB peak RSS, no torch) after HF 402; re-benchmarked the shipped model.
+3. [x] Live demo verified; README + GitHub homepage/topics have the links; CORS locked in render.yaml.
+3b. [x] Frontend redesign ("identity document" direction) — commit 7846fcb.
+4. [ ] README extras: demo GIF/screenshot at top, "Limitations & next steps" section.
+5. [ ] Small cleanups: root `test_setup.py`.
+6. [ ] **NEXT: walk user through backend file by file and quiz them** — order: session_orchestrator → detectors → risk_engine → quality_gates → behavior_analyzer. Explain each security fix in plain English with line refs, then 3–4 interview questions per file. User agreed to this (2026-10-08).
+7. [ ] Optional: async routes block on ML (needs mediapipe lock), Redis for limiter/sessions, spoof dataset for liveness, validation set for threshold tuning.
