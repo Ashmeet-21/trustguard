@@ -1,50 +1,56 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/AuthContext";
 import StepWizard from "@/components/StepWizard";
 import CameraCapture from "@/components/CameraCapture";
 import AudioRecorder from "@/components/AudioRecorder";
 import BehavioralTracker from "@/components/BehavioralTracker";
-import TrustScoreGauge from "@/components/TrustScoreGauge";
-import AgentStatusCard from "@/components/AgentStatusCard";
-import {
-  createSession,
-  runVerification,
-  checkFace,
-  type SessionResult,
-} from "@/lib/api";
+import VerificationDocument from "@/components/VerificationDocument";
+import { createSession, runVerification, checkFace, type SessionResult } from "@/lib/api";
 import type { BehaviorData } from "@/components/BehavioralTracker";
 
-/** Plain English quality gate labels */
+/** Plain-English quality gate results */
 function gateInfo(gate: string, passed: boolean): { title: string; description: string } {
   switch (gate) {
     case "replay_protection":
       return passed
-        ? { title: "Not a Replay", description: "This image hasn't been submitted before — it's a fresh upload." }
-        : { title: "Replay Detected", description: "This exact image was already submitted in a previous session. Please use a new photo to prevent reuse attacks." };
+        ? { title: "New photo", description: "This photo hasn’t been used in any earlier verification." }
+        : { title: "Photo used before", description: "This exact photo was already submitted in another session, so it may be a replay. Take a new selfie." };
     case "minimum_signals":
       return passed
-        ? { title: "Enough Data Collected", description: "At least 2 verification checks ran successfully, giving us reliable results." }
-        : { title: "Not Enough Data", description: "Only 1 verification check completed. We need at least 2 (e.g. selfie + voice) for a reliable result. Try adding more inputs." };
+        ? { title: "Enough checks ran", description: "At least two checks completed, so the decision doesn’t rest on one signal." }
+        : { title: "Too few checks ran", description: "Only one check completed. At least two are needed for an automatic pass." };
     case "signal_agreement":
       return passed
-        ? { title: "Checks Agree", description: "All verification agents reached similar conclusions — the results are consistent." }
-        : { title: "Checks Disagree", description: "The agents gave conflicting results (e.g. one says safe, another says risky). This is suspicious and needs review." };
+        ? { title: "Checks agree", description: "The checks reached similar conclusions." }
+        : { title: "Checks disagree", description: "One check looked safe while another looked risky. That mismatch needs a person to review." };
     default:
-      return passed
-        ? { title: gate.replace(/_/g, " "), description: "This check passed." }
-        : { title: gate.replace(/_/g, " "), description: "This check failed." };
+      return { title: gate.replace(/_/g, " "), description: passed ? "Passed." : "Failed." };
   }
 }
 
-const steps = [
-  { label: "Selfie", icon: "01" },
-  { label: "Voice", icon: "02" },
-  { label: "Behavior", icon: "03" },
-  { label: "Processing", icon: "04" },
-  { label: "Results", icon: "05" },
+const AGENT_LABELS: Record<string, string> = {
+  image_agent: "face check",
+  video_agent: "liveness check",
+  voice_agent: "voice check",
+  behavior_agent: "typing check",
+};
+
+/** Explanation lines not already shown elsewhere (check scores are on the record, gates have their own list). */
+function extraNotes(lines: string[]): string[] {
+  return lines
+    .filter((l) => !/^\w+_agent: (PASSED|FLAGGED)/.test(l) && !/^Quality gate/.test(l))
+    .map((l) => l.replace(/\b(image|video|voice|behavior)_agent\b/g, (m) => AGENT_LABELS[m] || m));
+}
+
+const STEPS = [
+  { label: "Photo", detail: "A selfie of your face" },
+  { label: "Voice", detail: "Read one sentence aloud" },
+  { label: "Typing", detail: "Type one sentence" },
+  { label: "Result", detail: "Your verification record" },
 ];
 
 export default function VerifyPage() {
@@ -52,13 +58,12 @@ export default function VerifyPage() {
   const { user, loading: authLoading } = useAuth();
 
   useEffect(() => {
-    if (!authLoading && !user) {
-      router.replace("/login");
-    }
+    if (!authLoading && !user) router.replace("/login");
   }, [authLoading, user, router]);
 
   const [currentStep, setCurrentStep] = useState(0);
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [behaviorData, setBehaviorData] = useState<BehaviorData | null>(null);
   const [result, setResult] = useState<SessionResult | null>(null);
@@ -70,11 +75,22 @@ export default function VerifyPage() {
   const [faceValid, setFaceValid] = useState(false);
   const [faceError, setFaceError] = useState<string | null>(null);
 
+  // Preview URL for the selfie (shown on the verification record)
+  useEffect(() => {
+    if (!imageFile) {
+      setPhotoUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(imageFile);
+    setPhotoUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [imageFile]);
+
   if (authLoading || !user) {
     return (
-      <div className="max-w-3xl mx-auto px-6 py-20 text-center">
-        <div className="spinner w-10 h-10 mx-auto mb-4" />
-        <p className="text-white/25 text-sm">Loading...</p>
+      <div className="max-w-6xl mx-auto px-6 py-24 flex items-center gap-3 text-ink-soft">
+        <div className="spinner w-5 h-5" />
+        Loading…
       </div>
     );
   }
@@ -86,14 +102,12 @@ export default function VerifyPage() {
     setFaceChecking(true);
 
     try {
-      const result = await checkFace(file);
-      if (!result.faceDetected) {
-        setFaceError(
-          "No face detected. Please take a clear selfie showing your full face within the oval guide."
-        );
+      const check = await checkFace(file);
+      if (!check.faceDetected) {
+        setFaceError("No face found. Take a clear selfie with your whole face inside the oval.");
         setImageFile(null);
-      } else if (result.faceBbox) {
-        const bbox = result.faceBbox;
+      } else if (check.faceBbox) {
+        const bbox = check.faceBbox;
         const EDGE = 0.04;
         const cutSides: string[] = [];
         if (bbox.x_min < EDGE) cutSides.push("left");
@@ -102,24 +116,16 @@ export default function VerifyPage() {
         if (bbox.y_max > 1 - EDGE) cutSides.push("bottom");
 
         if (cutSides.length > 0) {
-          setFaceError(
-            `Face is cut off at the ${cutSides.join(" and ")}. Please center your full face within the oval guide — no half face or cropped photos.`
-          );
+          setFaceError(`Your face is cut off at the ${cutSides.join(" and ")}. Centre your whole face inside the oval.`);
           setImageFile(null);
         } else if (bbox.width_pct < 0.15 || bbox.height_pct < 0.18) {
-          setFaceError(
-            "Face is too small in the photo. Please move closer to the camera so your face fills the oval guide."
-          );
+          setFaceError("Your face is too small in the photo. Move closer so it fills the oval.");
           setImageFile(null);
-        } else if (result.livenessScore < 0.3) {
-          setFaceError(
-            "Photo quality is too low — it appears blurry or taken from a screen. Please take a clear, well-lit selfie directly with your camera."
-          );
+        } else if (check.livenessScore < 0.3) {
+          setFaceError("The photo looks blurry or taken from a screen. Take a sharp, well-lit selfie directly with your camera.");
           setImageFile(null);
-        } else if (result.livenessScore < 0.5) {
-          setFaceError(
-            "Photo is unclear or blurry. Please ensure good lighting and hold your camera steady for a sharp selfie."
-          );
+        } else if (check.livenessScore < 0.5) {
+          setFaceError("The photo is unclear. Find better light and hold the camera steady.");
           setImageFile(null);
         } else {
           setFaceValid(true);
@@ -134,26 +140,10 @@ export default function VerifyPage() {
     }
   };
 
-  const handleAudioRecording = (blob: Blob) => {
-    setAudioBlob(blob);
-  };
-
-  const handleBehaviorComplete = (data: BehaviorData) => {
-    setBehaviorData(data);
-  };
-
   const handleImageReset = () => {
     setImageFile(null);
     setFaceValid(false);
     setFaceError(null);
-  };
-
-  const handleAudioReset = () => {
-    setAudioBlob(null);
-  };
-
-  const handleBehaviorReset = () => {
-    setBehaviorData(null);
   };
 
   const nextStep = () => setCurrentStep((s) => s + 1);
@@ -163,19 +153,13 @@ export default function VerifyPage() {
     setCurrentStep(3);
     setProcessing(true);
     setError(null);
-
     try {
       const session = await createSession();
-      const res = await runVerification(
-        session.session_id,
-        imageFile || undefined,
-        audioBlob || undefined,
-        behaviorData || undefined
-      );
+      const res = await runVerification(session.session_id, imageFile || undefined, audioBlob || undefined, behaviorData || undefined);
       setResult(res);
       setCurrentStep(4);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Verification failed");
+      setError(err instanceof Error ? err.message : "The verification could not be completed.");
       setCurrentStep(2);
     } finally {
       setProcessing(false);
@@ -193,247 +177,163 @@ export default function VerifyPage() {
     setFaceError(null);
   };
 
+  const stepHeading = (title: string, body: string) => (
+    <div className="mb-6">
+      <h2 className="text-xl font-bold text-ink">{title}</h2>
+      <p className="mt-1 text-ink-soft max-w-[60ch]">{body}</p>
+    </div>
+  );
+
+  const navButtons = (onNext: () => void, nextLabel: string, nextDisabled: boolean, showBack = true) => (
+    <div className="flex items-center justify-between gap-3 mt-8 pt-6 border-t border-rule">
+      {showBack ? (
+        <button onClick={prevStep} className="btn btn-quiet">Back</button>
+      ) : <span />}
+      <button onClick={onNext} disabled={nextDisabled} className="btn">{nextLabel}</button>
+    </div>
+  );
+
   return (
-    <div className="max-w-3xl mx-auto px-6 py-12">
-      {/* Header */}
-      <div className="text-center mb-10 fade-up">
-        <p className="text-[11px] uppercase tracking-[0.2em] text-white/20 mb-3">Verification</p>
-        <h1 className="text-3xl md:text-4xl font-bold text-white/90 tracking-tight">
-          Identity Verification
-        </h1>
-        <p className="text-white/30 text-sm mt-2">
-          Complete the steps below to verify your identity
-        </p>
-      </div>
+    <div className="max-w-6xl mx-auto px-6 py-10 md:py-14">
+      <h1 className="text-[2rem] md:text-[2.5rem] font-bold leading-tight tracking-[-0.02em] text-ink">
+        Verify your identity
+      </h1>
+      <p className="mt-2 text-ink-soft">Three short steps. Your camera and microphone are only used while a step is open.</p>
 
-      <div className="fade-up stagger-1">
-        <StepWizard steps={steps} currentStep={currentStep} />
-      </div>
+      <div className="mt-10 grid md:grid-cols-[14rem_1fr] gap-8 md:gap-12 items-start">
+        <StepWizard steps={STEPS} currentStep={Math.min(currentStep, 3)} />
 
-      {error && (
-        <div className="glass rounded-xl p-4 mb-6 text-sm border-[#f87171]/20 bg-[#f87171]/[0.04] fade-up" style={{ borderColor: 'rgba(248, 113, 113, 0.15)' }}>
-          <span className="text-[#f87171]/80">{error}</span>
-        </div>
-      )}
-
-      <div className="glass rounded-2xl p-7 fade-up stagger-2">
-        {/* Step 0: Selfie */}
-        {currentStep === 0 && (
-          <div>
-            <div className="flex items-center gap-3 mb-1">
-              <div className="w-7 h-7 rounded-lg bg-[#00d4ff]/[0.08] flex items-center justify-center border border-[#00d4ff]/10">
-                <span className="text-[10px] font-mono font-bold text-[#00d4ff]/60">01</span>
-              </div>
-              <h2 className="text-base font-semibold text-white/80">Take a Selfie</h2>
-            </div>
-            <p className="text-sm text-white/25 mb-5 ml-10">
-              Use your webcam or upload a photo. This checks for deepfakes and liveness.
+        <div>
+          {error && (
+            <p className="note note-fail mb-6" role="alert">
+              <span><strong className="font-semibold">The checks didn’t finish.</strong> {error}</span>
             </p>
-            <CameraCapture onCapture={handleImageCapture} onReset={handleImageReset} />
+          )}
 
-            {faceChecking && (
-              <div className="flex items-center gap-2.5 mt-4 text-sm text-white/30">
-                <div className="spinner w-4 h-4" />
-                Checking for face...
+          {currentStep === 0 && (
+            <section className="sheet p-6 sm:p-8">
+              {stepHeading("Take a selfie", "Use your camera or upload a photo. It’s checked for signs of AI generation and for a live person.")}
+              <CameraCapture onCapture={handleImageCapture} onReset={handleImageReset} />
+
+              <div className="mt-4" aria-live="polite">
+                {faceChecking && (
+                  <p className="flex items-center gap-2.5 text-ink-soft">
+                    <span className="spinner w-4 h-4" /> Checking the photo for a face…
+                  </p>
+                )}
+                {faceValid && !faceChecking && (
+                  <p className="note note-pass"><span>Face found. You can continue.</span></p>
+                )}
+                {faceError && <p className="note note-fail"><span>{faceError}</span></p>}
               </div>
-            )}
 
-            {faceValid && !faceChecking && (
-              <div className="glass rounded-lg p-3 mt-4 text-sm flex items-center gap-2" style={{ background: 'rgba(74, 222, 128, 0.04)', borderColor: 'rgba(74, 222, 128, 0.1)' }}>
-                <span className="w-1.5 h-1.5 rounded-full bg-[#4ade80]" />
-                <span className="text-[#4ade80]/80">Face detected — ready to proceed</span>
-              </div>
-            )}
+              {navButtons(nextStep, "Continue to voice", !imageFile || !faceValid || faceChecking, false)}
+            </section>
+          )}
 
-            {faceError && (
-              <div className="glass rounded-lg p-3 mt-4 text-sm" style={{ background: 'rgba(248, 113, 113, 0.04)', borderColor: 'rgba(248, 113, 113, 0.1)' }}>
-                <span className="text-[#f87171]/80">{faceError}</span>
-              </div>
-            )}
+          {currentStep === 1 && (
+            <section className="sheet p-6 sm:p-8">
+              {stepHeading("Read a sentence aloud", "Record yourself reading the sentence below. The recording is checked for signs of a synthetic voice.")}
+              <AudioRecorder onRecording={setAudioBlob} onReset={() => setAudioBlob(null)} />
+              {navButtons(nextStep, "Continue to typing", !audioBlob)}
+            </section>
+          )}
 
-            <div className="flex justify-between mt-8">
-              <div />
-              <button
-                onClick={nextStep}
-                disabled={!imageFile || !faceValid || faceChecking}
-                className="btn-glow text-white px-6 py-2.5 rounded-xl text-sm font-medium disabled:opacity-20 disabled:cursor-not-allowed disabled:transform-none"
-              >
-                Next: Voice Sample
-              </button>
-            </div>
-          </div>
-        )}
+          {currentStep === 2 && (
+            <section className="sheet p-6 sm:p-8">
+              {stepHeading("Type a sentence", "Type the sentence below and move your mouse as you normally would. The timing is checked for scripted input.")}
+              <BehavioralTracker onComplete={setBehaviorData} onReset={() => setBehaviorData(null)} />
+              {navButtons(runFullVerification, "Run the checks", !behaviorData)}
+            </section>
+          )}
 
-        {/* Step 1: Voice */}
-        {currentStep === 1 && (
-          <div>
-            <div className="flex items-center gap-3 mb-1">
-              <div className="w-7 h-7 rounded-lg bg-[#7b2ff7]/[0.08] flex items-center justify-center border border-[#7b2ff7]/10">
-                <span className="text-[10px] font-mono font-bold text-[#7b2ff7]/60">02</span>
-              </div>
-              <h2 className="text-base font-semibold text-white/80">Voice Sample</h2>
-            </div>
-            <p className="text-sm text-white/25 mb-5 ml-10">
-              Record yourself reading the phrase below. This checks for synthetic voice.
-            </p>
-            <AudioRecorder onRecording={handleAudioRecording} onReset={handleAudioReset} />
-            <div className="flex justify-between mt-8">
-              <button
-                onClick={prevStep}
-                className="text-white/20 hover:text-white/50 text-sm transition-colors duration-300"
-              >
-                Back
-              </button>
-              <button
-                onClick={nextStep}
-                disabled={!audioBlob}
-                className="btn-glow text-white px-6 py-2.5 rounded-xl text-sm font-medium disabled:opacity-20 disabled:cursor-not-allowed disabled:transform-none"
-              >
-                Next: Behavior Test
-              </button>
-            </div>
-          </div>
-        )}
+          {currentStep === 3 && processing && (
+            <section className="sheet p-6 sm:p-8" aria-live="polite" aria-busy="true">
+              {stepHeading("Running the checks", "This usually takes 5–10 seconds. If the server has been idle, it can take up to a minute to start.")}
+              <ul className="divide-y divide-rule border-y border-rule">
+                {[
+                  imageFile && "Face is not AI-generated",
+                  imageFile && "A live person, not a photo of one",
+                  audioBlob && "Voice is human, not synthetic",
+                  behaviorData && "Typing is human, not scripted",
+                ].filter(Boolean).map((label) => (
+                  <li key={label as string} className="py-3 flex items-center gap-3 text-ink">
+                    <span className="spinner w-4 h-4 shrink-0" /> {label}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
 
-        {/* Step 2: Behavior */}
-        {currentStep === 2 && (
-          <div>
-            <div className="flex items-center gap-3 mb-1">
-              <div className="w-7 h-7 rounded-lg bg-[#4ade80]/[0.08] flex items-center justify-center border border-[#4ade80]/10">
-                <span className="text-[10px] font-mono font-bold text-[#4ade80]/60">03</span>
-              </div>
-              <h2 className="text-base font-semibold text-white/80">Behavioral Test</h2>
-            </div>
-            <p className="text-sm text-white/25 mb-5 ml-10">
-              Type the sentence below while moving your mouse. This checks for bot-like patterns.
-            </p>
-            <BehavioralTracker onComplete={handleBehaviorComplete} onReset={handleBehaviorReset} />
-            <div className="flex justify-between mt-8">
-              <button
-                onClick={prevStep}
-                className="text-white/20 hover:text-white/50 text-sm transition-colors duration-300"
-              >
-                Back
-              </button>
-              <button
-                onClick={runFullVerification}
-                disabled={!behaviorData}
-                className="btn-glow text-white px-6 py-2.5 rounded-xl text-sm font-medium disabled:opacity-20 disabled:cursor-not-allowed disabled:transform-none"
-              >
-                Submit for Verification
-              </button>
-            </div>
-          </div>
-        )}
+          {currentStep === 4 && result && (
+            <section>
+              <VerificationDocument
+                animate
+                decision={result.decision}
+                trustScore={result.trust_score}
+                photoUrl={photoUrl}
+                holder={user.full_name || user.email}
+                sessionId={result.session_id}
+                checks={Object.entries(result.agents).map(([key, a]) => ({ key, score: a.score, risk: a.risk_level }))}
+              />
 
-        {/* Step 3: Processing */}
-        {currentStep === 3 && processing && (
-          <div className="text-center py-20">
-            <div className="relative w-16 h-16 mx-auto mb-8">
-              <div className="spinner w-16 h-16 border-[3px]" />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-2 h-2 rounded-full bg-[#7b2ff7]/50 animate-pulse" />
-              </div>
-            </div>
-            <h2 className="text-base font-semibold text-white/70 mb-2">
-              Running Verification
-            </h2>
-            <p className="text-sm text-white/25 mb-6">
-              Analyzing your selfie, voice, and behavior patterns...
-            </p>
-            <div className="space-y-1.5 text-[12px] text-white/15 font-mono">
-              {imageFile && <p>deepfake_agent: running...</p>}
-              {imageFile && <p>liveness_agent: running...</p>}
-              {audioBlob && <p>voice_agent: running...</p>}
-              {behaviorData && <p>behavior_agent: running...</p>}
-              <p>risk_engine: waiting...</p>
-            </div>
-          </div>
-        )}
+              <div className="mt-8 grid lg:grid-cols-2 gap-8">
+                {result.quality_gates && result.quality_gates.length > 0 && (
+                  <div>
+                    <h2 className="font-bold text-ink text-lg">Quality gates</h2>
+                    <ul className="mt-3 divide-y divide-rule border-y border-rule">
+                      {result.quality_gates.map((gate) => {
+                        const info = gateInfo(gate.gate, gate.passed);
+                        return (
+                          <li key={gate.gate} className="py-3 flex gap-3">
+                            <span
+                              className={`mt-1 shrink-0 w-4 h-4 rounded-full flex items-center justify-center text-white text-[0.625rem] font-bold ${gate.passed ? "bg-pass" : "bg-fail"}`}
+                              aria-hidden="true"
+                            >
+                              {gate.passed ? "✓" : "!"}
+                            </span>
+                            <span>
+                              <span className="block font-medium text-ink">
+                                {info.title}<span className="sr-only">{gate.passed ? " (passed)" : " (failed)"}</span>
+                              </span>
+                              <span className="block text-sm text-ink-soft">{info.description}</span>
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                )}
 
-        {/* Step 4: Results */}
-        {currentStep === 4 && result && (
-          <div>
-            <div className="text-center mb-8">
-              <div className="relative inline-block">
-                <TrustScoreGauge
-                  score={result.trust_score}
-                  decision={result.decision}
-                />
-              </div>
-            </div>
-
-            {/* Agent Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
-              {Object.entries(result.agents).map(([name, agent]) => (
-                <AgentStatusCard key={name} name={name} result={agent} />
-              ))}
-            </div>
-
-            {/* Explanation */}
-            {result.explanation && result.explanation.length > 0 && (
-              <div className="glass rounded-xl p-5 mb-4">
-                <p className="text-[10px] uppercase tracking-[0.15em] text-white/20 mb-3">Explanation</p>
-                <ul className="space-y-1.5">
-                  {result.explanation.map((line, i) => (
-                    <li key={i} className="text-sm text-white/35 flex items-start gap-2">
-                      <span className="text-white/10 mt-0.5">&mdash;</span>
-                      {line}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {/* Quality Gates */}
-            {result.quality_gates && result.quality_gates.length > 0 && (
-              <div className="glass rounded-xl p-5 mb-6">
-                <p className="text-[10px] uppercase tracking-[0.15em] text-white/20 mb-4">Quality Checks</p>
-                <div className="space-y-2">
-                  {result.quality_gates.map((gate, i) => {
-                    const info = gateInfo(gate.gate, gate.passed);
-                    const color = gate.passed ? "#4ade80" : "#f87171";
-                    return (
-                      <div
-                        key={i}
-                        className="flex items-start gap-3 text-sm rounded-lg p-3"
-                        style={{
-                          background: `${color}06`,
-                          border: `1px solid ${color}15`,
-                        }}
-                      >
-                        <span
-                          className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0"
-                          style={{ backgroundColor: color, opacity: 0.7 }}
-                        />
-                        <div>
-                          <p className="font-medium" style={{ color, opacity: 0.8 }}>
-                            {info.title}
-                          </p>
-                          <p className="text-[12px] text-white/25 mt-0.5">{info.description}</p>
-                        </div>
-                      </div>
-                    );
-                  })}
+                <div>
+                  <h2 className="font-bold text-ink text-lg">Details</h2>
+                  <dl className="mt-3 divide-y divide-rule border-y border-rule text-sm">
+                    <div className="py-3 flex justify-between gap-4">
+                      <dt className="text-ink-soft">Session</dt>
+                      <dd className="font-mono text-ink">{result.session_id}</dd>
+                    </div>
+                    <div className="py-3 flex justify-between gap-4">
+                      <dt className="text-ink-soft">Processing time</dt>
+                      <dd className="text-ink figures">{(result.processing_time_ms / 1000).toFixed(1)} s</dd>
+                    </div>
+                  </dl>
+                  {extraNotes(result.explanation || []).length > 0 && (
+                    <ul className="mt-4 space-y-2">
+                      {extraNotes(result.explanation).map((line) => (
+                        <li key={line} className="note note-review"><span>{line}</span></li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               </div>
-            )}
 
-            <div className="flex items-center justify-between text-[11px] text-white/15 font-mono">
-              <span>session: {result.session_id.slice(0, 8)}...</span>
-              <span>{result.processing_time_ms}ms</span>
-            </div>
-
-            <div className="text-center mt-8">
-              <button
-                onClick={restart}
-                className="btn-glow text-white px-6 py-2.5 rounded-xl text-sm font-medium"
-              >
-                Verify Again
-              </button>
-            </div>
-          </div>
-        )}
+              <div className="mt-10 flex flex-wrap gap-3">
+                <button onClick={restart} className="btn">Verify again</button>
+                <Link href="/dashboard" className="btn btn-quiet">Open dashboard</Link>
+              </div>
+            </section>
+          )}
+        </div>
       </div>
     </div>
   );

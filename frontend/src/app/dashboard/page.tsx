@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { getAnalyticsSummary, getRecentActivity } from "@/lib/api";
 import { useAuth } from "@/lib/AuthContext";
-import Link from "next/link";
 
 interface Summary {
   total_verifications: number;
@@ -27,30 +27,55 @@ interface ActivityItem {
   created_at?: string;
 }
 
-const riskColors: Record<string, string> = {
-  LOW: "#4ade80",
-  MEDIUM: "#fbbf24",
-  HIGH: "#f87171",
-  CRITICAL: "#dc2626",
+const RISK_LEVELS = ["LOW", "MEDIUM", "HIGH", "CRITICAL"] as const;
+
+const RISK_STYLE: Record<string, { word: string; color: string; meaning: string }> = {
+  LOW: { word: "Low", color: "var(--color-pass)", meaning: "Every check passed cleanly" },
+  MEDIUM: { word: "Medium", color: "var(--color-review)", meaning: "Minor concerns, may need another look" },
+  HIGH: { word: "High", color: "var(--color-fail)", meaning: "Clear signs of a fake or a bot" },
+  CRITICAL: { word: "Critical", color: "var(--color-fail)", meaning: "Strong signs of a deepfake, spoof or bot" },
 };
 
-const riskExplanations: Record<string, string> = {
-  LOW: "High confidence the input is authentic. All checks passed cleanly.",
-  MEDIUM: "Some minor concerns detected. May need additional verification.",
-  HIGH: "Significant red flags found. Likely fake or manipulated content.",
-  CRITICAL: "Strong indicators of deepfake, spoof, or bot activity detected.",
+const TYPE_LABELS: Record<string, string> = {
+  session: "Full verification",
+  kyc: "Face and liveness",
+  deepfake_image: "Face check (image)",
+  deepfake_video: "Face check (video)",
+  liveness_image: "Liveness (image)",
+  liveness_video: "Liveness (video)",
+  voice: "Voice check",
+  behavior: "Typing check",
+  voice_batch: "Voice check (batch)",
+  batch: "Face check (batch)",
 };
 
-const typeLabels: Record<string, string> = {
-  deepfake_image: "Deepfake (Image)",
-  deepfake_video: "Deepfake (Video)",
-  liveness_image: "Liveness (Image)",
-  liveness_video: "Liveness (Video)",
-  voice_detection: "Voice Analysis",
-  behavior_analysis: "Behavioral Check",
-  kyc: "Full KYC",
-  batch: "Batch Scan",
-};
+const typeLabel = (t?: string) => (t ? TYPE_LABELS[t] || t.replace(/_/g, " ") : "—");
+
+function resultLabel(item: ActivityItem): { text: string; bad: boolean } | null {
+  if (item.is_deepfake === null || item.is_deepfake === undefined) return null;
+  if (item.type.startsWith("liveness")) return item.is_deepfake ? { text: "Spoof", bad: true } : { text: "Live", bad: false };
+  return item.is_deepfake ? { text: "Flagged", bad: true } : { text: "Clean", bad: false };
+}
+
+function formatTime(iso?: string) {
+  if (!iso) return "—";
+  const d = new Date(iso.endsWith("Z") ? iso : iso + "Z"); // API sends UTC without a zone
+  return d.toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+}
+
+/** 340 -> "340 ms", 6856 -> "6.9 s" */
+function formatDuration(ms?: number) {
+  if (!ms && ms !== 0) return "—";
+  return ms < 1000 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(1)} s`;
+}
+
+function Bar({ pct, color }: { pct: number; color: string }) {
+  return (
+    <span className="block h-2 bg-rule/60 rounded-full overflow-hidden" aria-hidden="true">
+      <span className="block h-full rounded-full" style={{ width: `${Math.max(pct, pct > 0 ? 2 : 0)}%`, background: color }} />
+    </span>
+  );
+}
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -58,12 +83,9 @@ export default function DashboardPage() {
   const [summary, setSummary] = useState<Summary | null>(null);
   const [activity, setActivity] = useState<ActivityItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [expandedRisk, setExpandedRisk] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!authLoading && !user) {
-      router.replace("/login");
-    }
+    if (!authLoading && !user) router.replace("/login");
   }, [authLoading, user, router]);
 
   useEffect(() => {
@@ -78,262 +100,134 @@ export default function DashboardPage() {
 
   if (authLoading || !user || loading) {
     return (
-      <div className="max-w-6xl mx-auto px-6 py-20 text-center">
-        <div className="spinner w-10 h-10 mx-auto mb-4" />
-        <p className="text-white/25 text-sm">Loading analytics...</p>
+      <div className="max-w-6xl mx-auto px-6 py-24 flex items-center gap-3 text-ink-soft">
+        <div className="spinner w-5 h-5" />
+        Loading the dashboard…
       </div>
     );
   }
 
-  const hasData = summary && summary.total_verifications > 0;
-  const catchRate = hasData && summary.total_verifications > 0
-    ? Math.round((summary.deepfakes_caught / summary.total_verifications) * 100)
-    : 0;
+  const total = summary?.total_verifications || 0;
+  const pctOf = (n: number) => (total ? Math.round((n / total) * 100) : 0);
 
   return (
-    <div className="max-w-6xl mx-auto px-6 py-10">
-      {/* Header */}
-      <div className="flex items-end justify-between mb-10 fade-up">
+    <div className="max-w-6xl mx-auto px-6 py-10 md:py-14">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <p className="text-[11px] uppercase tracking-[0.2em] text-white/20 mb-2">Analytics</p>
-          <h1 className="text-3xl md:text-4xl font-bold text-white/90 tracking-tight">Dashboard</h1>
-          <p className="text-white/25 text-sm mt-1.5">
-            Real-time metrics from all verification scans
-          </p>
+          <h1 className="text-[2rem] md:text-[2.5rem] font-bold leading-tight tracking-[-0.02em] text-ink">Dashboard</h1>
+          <p className="mt-2 text-ink-soft">Every check run on this TrustGuard server, newest first.</p>
         </div>
-        <Link
-          href="/verify"
-          className="btn-glow text-white px-5 py-2.5 rounded-xl text-sm font-medium hidden md:block"
-        >
-          New Verification
-        </Link>
+        <Link href="/verify" className="btn self-start sm:self-auto">Start a verification</Link>
       </div>
 
-      {!hasData ? (
-        /* Empty state */
-        <div className="glass rounded-2xl p-14 text-center mb-8 fade-up stagger-1">
-          <div className="w-12 h-12 rounded-2xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-center mx-auto mb-5">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-white/20">
-              <path d="M18 20V10M12 20V4M6 20v-6" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </div>
-          <h2 className="text-base font-semibold text-white/70 mb-2">No Verification Data Yet</h2>
-          <p className="text-sm text-white/25 mb-8 max-w-md mx-auto">
-            Run your first verification to see analytics here. Every scan gets tracked with
-            its result, risk level, and processing time.
+      {!summary || total === 0 ? (
+        <div className="sheet mt-10 px-6 py-14 text-center">
+          <h2 className="text-xl font-bold text-ink">No verifications yet</h2>
+          <p className="mt-2 text-ink-soft max-w-md mx-auto">
+            Run a verification and its result, risk level and timing will appear here.
           </p>
-          <Link
-            href="/verify"
-            className="btn-glow text-white px-6 py-2.5 rounded-xl text-sm font-medium inline-block"
-          >
-            Run First Verification
-          </Link>
+          <Link href="/verify" className="btn mt-6">Start a verification</Link>
         </div>
       ) : (
         <>
-          {/* Summary Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+          {/* Summary strip */}
+          <dl className="mt-10 grid grid-cols-2 lg:grid-cols-4 border-y-2 border-ink">
             {[
-              {
-                label: "Total Scans",
-                value: summary.total_verifications,
-                sub: "All-time requests",
-                color: "#00d4ff",
-              },
-              {
-                label: "Flagged",
-                value: summary.deepfakes_caught,
-                sub: `${catchRate}% catch rate`,
-                color: "#f87171",
-              },
-              {
-                label: "Clean",
-                value: summary.clean_results,
-                sub: "Verified authentic",
-                color: "#4ade80",
-              },
-              {
-                label: "Avg Speed",
-                value: `${Math.round(summary.avg_processing_time_ms)}ms`,
-                sub: "Per verification",
-                color: "#fbbf24",
-              },
-            ].map((card, i) => (
-              <div key={i} className={`glass rounded-2xl p-5 fade-up stagger-${i + 1}`}>
-                <p className="text-[10px] uppercase tracking-[0.15em] text-white/15 mb-3">{card.label}</p>
-                <div className="text-2xl font-bold font-mono" style={{ color: card.color, opacity: 0.8 }}>
-                  {card.value}
-                </div>
-                <p className="text-[11px] text-white/15 mt-1">{card.sub}</p>
+              { label: "Checks run", value: total.toLocaleString() },
+              { label: "Flagged as fake or bot", value: `${summary.deepfakes_caught.toLocaleString()}`, sub: `${pctOf(summary.deepfakes_caught)}% of all checks` },
+              { label: "Came back clean", value: summary.clean_results.toLocaleString(), sub: `${pctOf(summary.clean_results)}% of all checks` },
+              { label: "Average processing time", value: formatDuration(summary.avg_processing_time_ms) },
+            ].map((s, i) => (
+              <div
+                key={s.label}
+                className={`py-5 pr-4 ${i % 2 === 1 ? "pl-5 border-l border-rule" : ""} ${i === 2 ? "lg:pl-5 lg:border-l border-t lg:border-t-0 border-rule" : ""} ${i === 3 ? "border-t lg:border-t-0" : ""}`}
+              >
+                <dt className="text-sm text-ink-soft">{s.label}</dt>
+                <dd className="mt-1 text-[1.75rem] font-bold leading-tight text-ink figures">{s.value}</dd>
+                {s.sub && <dd className="text-sm text-ink-faint figures">{s.sub}</dd>}
               </div>
             ))}
-          </div>
+          </dl>
 
-          {/* Charts Row */}
-          <div className="grid md:grid-cols-2 gap-3 mb-8">
-            {/* By Type */}
-            <div className="glass rounded-2xl p-6 fade-up stagger-5">
-              <p className="text-[10px] uppercase tracking-[0.15em] text-white/15 mb-1">Scans by Type</p>
-              <p className="text-[11px] text-white/10 mb-5">Which detection agents were used</p>
-              {summary.by_type && Object.entries(summary.by_type).length > 0 ? (
-                <div className="space-y-4">
-                  {Object.entries(summary.by_type).map(([type, count]) => {
-                    const total = summary.total_verifications || 1;
-                    const pct = Math.round((count / total) * 100);
-                    const label = typeLabels[type] || type.replace(/_/g, " ");
-                    return (
-                      <div key={type}>
-                        <div className="flex justify-between text-[11px] mb-1.5">
-                          <span className="text-white/40">{label}</span>
-                          <span className="text-white/15 font-mono">{count} ({pct}%)</span>
-                        </div>
-                        <div className="w-full h-1 bg-white/[0.03] rounded-full overflow-hidden">
-                          <div
-                            className="h-full rounded-full transition-all duration-1000 ease-out"
-                            style={{
-                              width: `${Math.max(pct, 2)}%`,
-                              background: 'linear-gradient(90deg, #00d4ff, #7b2ff7)',
-                              opacity: 0.6,
-                            }}
-                          />
-                        </div>
+          {/* Distributions */}
+          <div className="mt-10 grid lg:grid-cols-2 gap-10">
+            <section>
+              <h2 className="text-lg font-bold text-ink">By check type</h2>
+              <ul className="mt-4 space-y-4">
+                {Object.entries(summary.by_type)
+                  .sort((a, b) => b[1] - a[1])
+                  .map(([type, count]) => (
+                    <li key={type}>
+                      <div className="flex justify-between gap-4 text-sm mb-1.5">
+                        <span className="text-ink">{typeLabel(type)}</span>
+                        <span className="text-ink-soft figures">{count} ({pctOf(count)}%)</span>
                       </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <p className="text-white/15 text-sm">No data yet</p>
-              )}
-            </div>
+                      <Bar pct={pctOf(count)} color="var(--color-ink)" />
+                    </li>
+                  ))}
+              </ul>
+            </section>
 
-            {/* By Risk */}
-            <div className="glass rounded-2xl p-6 fade-up stagger-6">
-              <p className="text-[10px] uppercase tracking-[0.15em] text-white/15 mb-1">Risk Distribution</p>
-              <p className="text-[11px] text-white/10 mb-5">Click a level for details</p>
-              {summary.by_risk_level && Object.entries(summary.by_risk_level).length > 0 ? (
-                <div className="space-y-4">
-                  {["LOW", "MEDIUM", "HIGH", "CRITICAL"].map((level) => {
-                    const count = summary.by_risk_level[level] || 0;
-                    const total = summary.total_verifications || 1;
-                    const pct = Math.round((count / total) * 100);
-                    const isExpanded = expandedRisk === level;
-                    const color = riskColors[level];
-                    return (
-                      <div key={level}>
-                        <button
-                          onClick={() => setExpandedRisk(isExpanded ? null : level)}
-                          className="w-full text-left group"
-                        >
-                          <div className="flex justify-between text-[11px] mb-1.5">
-                            <span
-                              className="font-medium group-hover:opacity-100 transition-opacity"
-                              style={{ color, opacity: 0.6 }}
-                            >
-                              {level}
-                              <span className="text-white/10 ml-1">{isExpanded ? "−" : "+"}</span>
-                            </span>
-                            <span className="text-white/15 font-mono">{count} ({pct}%)</span>
-                          </div>
-                        </button>
-                        <div className="w-full h-1 bg-white/[0.03] rounded-full overflow-hidden">
-                          <div
-                            className="h-full rounded-full transition-all duration-1000 ease-out"
-                            style={{
-                              width: `${Math.max(pct, 2)}%`,
-                              backgroundColor: color,
-                              opacity: 0.5,
-                            }}
-                          />
-                        </div>
-                        {isExpanded && (
-                          <p
-                            className="text-[11px] text-white/20 mt-2 pl-3 border-l"
-                            style={{ borderColor: `${color}30` }}
-                          >
-                            {riskExplanations[level]}
-                          </p>
-                        )}
+            <section>
+              <h2 className="text-lg font-bold text-ink">By risk level</h2>
+              <ul className="mt-4 space-y-4">
+                {RISK_LEVELS.map((level) => {
+                  const count = summary.by_risk_level[level] || 0;
+                  const style = RISK_STYLE[level];
+                  return (
+                    <li key={level}>
+                      <div className="flex justify-between gap-4 text-sm mb-1.5">
+                        <span>
+                          <span className="font-medium" style={{ color: style.color }}>{style.word}</span>
+                          <span className="text-ink-faint"> — {style.meaning}</span>
+                        </span>
+                        <span className="text-ink-soft figures shrink-0">{count} ({pctOf(count)}%)</span>
                       </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <p className="text-white/15 text-sm">No data yet</p>
-              )}
-            </div>
+                      <Bar pct={pctOf(count)} color={style.color} />
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
           </div>
         </>
       )}
 
-      {/* Recent Activity */}
-      <div className="glass rounded-2xl p-6 fade-up stagger-7">
-        <div className="flex items-center justify-between mb-5">
-          <div>
-            <p className="text-[10px] uppercase tracking-[0.15em] text-white/15 mb-0.5">Recent Activity</p>
-            <p className="text-[11px] text-white/10">
-              Last {activity.length} results — newest first
-            </p>
-          </div>
-        </div>
-
+      {/* Recent activity */}
+      <section className="mt-14">
+        <h2 className="text-lg font-bold text-ink">Recent checks</h2>
         {activity.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full min-w-[40rem] text-left text-[0.9375rem]">
               <thead>
-                <tr className="text-[10px] text-white/15 uppercase tracking-wider border-b border-white/[0.04]">
-                  <th className="text-left py-2.5 pr-4 font-medium">Type</th>
-                  <th className="text-left py-2.5 pr-4 font-medium">File</th>
-                  <th className="text-left py-2.5 pr-4 font-medium">Result</th>
-                  <th className="text-left py-2.5 pr-4 font-medium">Risk</th>
-                  <th className="text-right py-2.5 font-medium">Time</th>
+                <tr className="border-b-2 border-ink">
+                  <th scope="col" className="py-2.5 pr-4 font-semibold">When</th>
+                  <th scope="col" className="py-2.5 pr-4 font-semibold">Check</th>
+                  <th scope="col" className="py-2.5 pr-4 font-semibold">Result</th>
+                  <th scope="col" className="py-2.5 pr-4 font-semibold">Risk</th>
+                  <th scope="col" className="py-2.5 font-semibold text-right">Time</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="figures">
                 {activity.map((item) => {
-                  const typeLabel = typeLabels[item.type] || item.type?.replace(/_/g, " ") || "—";
+                  const res = resultLabel(item);
+                  const risk = item.risk_level ? RISK_STYLE[item.risk_level] : null;
                   return (
-                    <tr
-                      key={item.id}
-                      className="border-b border-white/[0.02] hover:bg-white/[0.02] transition-colors duration-200"
-                    >
-                      <td className="py-3 pr-4 text-white/40 text-[12px]">{typeLabel}</td>
-                      <td className="py-3 pr-4 text-white/20 max-w-[150px] truncate text-[12px] font-mono">
-                        {item.filename || "—"}
-                      </td>
+                    <tr key={item.id} className="border-b border-rule">
+                      <td className="py-3 pr-4 text-ink-soft whitespace-nowrap">{formatTime(item.created_at)}</td>
+                      <td className="py-3 pr-4 text-ink">{typeLabel(item.type)}</td>
                       <td className="py-3 pr-4">
-                        {item.is_deepfake !== null && item.is_deepfake !== undefined ? (
-                          <span
-                            className="text-[11px] font-medium"
-                            style={{ color: item.is_deepfake ? "#f87171" : "#4ade80", opacity: 0.7 }}
-                          >
-                            {["liveness_image", "liveness_video"].includes(item.type)
-                              ? item.is_deepfake ? "SPOOF" : "LIVE"
-                              : item.is_deepfake ? "FLAGGED" : "CLEAN"}
-                          </span>
+                        {res ? (
+                          <span className={res.bad ? "text-fail font-medium" : "text-pass font-medium"}>{res.text}</span>
                         ) : (
-                          <span className="text-white/10">—</span>
+                          <span className="text-ink-faint">—</span>
                         )}
                       </td>
                       <td className="py-3 pr-4">
-                        {item.risk_level ? (
-                          <span
-                            className="text-[10px] font-mono px-2 py-0.5 rounded"
-                            style={{
-                              backgroundColor: `${riskColors[item.risk_level] || "#999"}08`,
-                              color: riskColors[item.risk_level] || "#999",
-                              opacity: 0.7,
-                            }}
-                          >
-                            {item.risk_level}
-                          </span>
-                        ) : (
-                          <span className="text-white/10">—</span>
-                        )}
+                        {risk ? <span style={{ color: risk.color }}>{risk.word}</span> : <span className="text-ink-faint">—</span>}
                       </td>
-                      <td className="py-3 text-right text-white/15 text-[12px] font-mono">
-                        {item.processing_time_ms
-                          ? `${Math.round(item.processing_time_ms)}ms`
-                          : "—"}
+                      <td className="py-3 text-right text-ink-soft">
+                        {formatDuration(item.processing_time_ms)}
                       </td>
                     </tr>
                   );
@@ -342,14 +236,9 @@ export default function DashboardPage() {
             </table>
           </div>
         ) : (
-          <div className="text-center py-12">
-            <p className="text-white/20 text-sm mb-1">No verification activity yet.</p>
-            <p className="text-[11px] text-white/10">
-              Each scan gets logged here with its result, risk level, and processing time.
-            </p>
-          </div>
+          <p className="mt-4 text-ink-soft">Nothing yet. Each check you run is listed here.</p>
         )}
-      </div>
+      </section>
     </div>
   );
 }

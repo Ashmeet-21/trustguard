@@ -1,418 +1,282 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import VerificationDocument from "@/components/VerificationDocument";
 
 export const metadata: Metadata = {
-  title: "TrustGuard — AI-Powered Identity Verification",
+  title: "TrustGuard — identity verification",
   description:
-    "Detect deepfakes, verify liveness, analyze voice authenticity, and check behavioral patterns — all combined into one trust score.",
+    "Checks a selfie, a voice sample and typing behaviour to decide whether a person is real — with every check, score and rule shown.",
 };
+
+const BENCHMARK_URL = "https://github.com/Ashmeet-21/trustguard/blob/master/benchmarks/RESULTS.md";
+const COMPARISON_URL = "https://github.com/Ashmeet-21/trustguard/blob/master/benchmarks/MODEL_COMPARISON.md";
+
+const CHECKS = [
+  {
+    name: "Face is not AI-generated",
+    how: "Vision Transformer trained on images from thousands of generators",
+    catches: "AI-generated and AI-edited faces",
+    misses: "Face swaps onto real photos",
+    weight: 30,
+  },
+  {
+    name: "A live person",
+    how: "Six image tests: face geometry, skin texture, screen moiré, colour, edges, sharpness",
+    catches: "Printed photos and photos of screens",
+    misses: "High-quality masks",
+    weight: 25,
+  },
+  {
+    name: "Human voice",
+    how: "Spectral analysis of a phrase read aloud",
+    catches: "Flat, monotone synthetic speech",
+    misses: "Modern voice clones",
+    weight: 25,
+  },
+  {
+    name: "Human typing",
+    how: "Time between keys, rhythm, mouse speed and path",
+    catches: "Scripts and bots filling in forms",
+    misses: "A person typing on someone else’s behalf",
+    weight: 20,
+  },
+];
+
+const STEPS = [
+  {
+    title: "Each check scores 0–100",
+    body: "A check that can’t run is recorded as not run. It is never filled in with a guess.",
+  },
+  {
+    title: "Scores are weighted into a trust score",
+    body: "Face 30%, liveness 25%, voice 25%, typing 20%. If a check is missing, its weight is shared among the others.",
+  },
+  {
+    title: "Rules set the decision",
+    body: "Fail below 40, on any critical risk, or when two checks are flagged. Review below 70 or when one check is flagged. Otherwise pass.",
+  },
+  {
+    title: "Quality gates can only make it stricter",
+    body: "A photo already used in another session fails. Too few checks, or checks that disagree, turn a pass into a review. A crashed check can never produce a pass.",
+  },
+  {
+    title: "Everything is written to an audit record",
+    body: "Each score, rule and gate behind the decision is stored and can be read back by the account that ran it.",
+  },
+];
 
 export default function Home() {
   return (
-    <div className="relative">
-      {/* Hero Section */}
-      <section className="relative min-h-[85vh] flex items-center justify-center overflow-hidden">
-        {/* Floating orbs */}
-        <div className="orb w-[500px] h-[500px] bg-[#7b2ff7]/[0.07] top-[10%] left-[10%]" />
-        <div className="orb w-[400px] h-[400px] bg-[#00d4ff]/[0.05] bottom-[10%] right-[15%]" style={{ animationDelay: '-5s' }} />
-        <div className="orb w-[300px] h-[300px] bg-[#ff006e]/[0.04] top-[40%] right-[30%]" style={{ animationDelay: '-10s' }} />
-
-        <div className="relative max-w-5xl mx-auto px-6 text-center">
-          {/* Badge */}
-          <div className="fade-up stagger-1">
-            <div className="inline-flex items-center gap-2 text-[11px] font-medium text-white/50 border border-white/[0.08] rounded-full px-4 py-1.5 mb-8 backdrop-blur-sm">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#4ade80] animate-pulse" />
-              4 AI Agents Working Together
-            </div>
-          </div>
-
-          {/* Headline */}
-          <h1 className="fade-up stagger-2 text-5xl md:text-7xl lg:text-8xl font-bold tracking-tight leading-[0.95] mb-6">
-            <span className="text-white">Is this person</span>
-            <br />
-            <span className="gradient-text">real or fake?</span>
+    <>
+      {/* Hero */}
+      <section className="max-w-6xl mx-auto px-6 pt-14 pb-20 md:pt-20 grid lg:grid-cols-[1fr_minmax(0,34rem)] gap-12 lg:gap-16 items-center">
+        <div className="max-w-xl">
+          <h1 className="text-[2.5rem] md:text-[3.25rem] leading-[1.05] font-bold tracking-[-0.02em] text-ink">
+            Check that a person is real before you let them in.
           </h1>
+          <p className="mt-6 text-lg text-ink-soft leading-relaxed">
+            TrustGuard checks a selfie, a short voice recording and the way someone types. Four
+            independent checks feed one decision — pass, review or fail — and every score and rule
+            behind it is shown.
+          </p>
+          <div className="mt-8 flex flex-wrap gap-3">
+            <Link href="/verify" className="btn">
+              Start a verification
+            </Link>
+            <a href="#accuracy" className="btn btn-quiet">
+              See how accurate it is
+            </a>
+          </div>
+        </div>
 
-          {/* Subhead */}
-          <p className="fade-up stagger-3 text-base md:text-lg text-white/35 max-w-xl mx-auto mb-10 leading-relaxed">
-            One selfie. One voice clip. One typing test.
-            <br className="hidden md:block" />
-            Four independent AI agents. One trust score.
+        <VerificationDocument
+          specimen
+          decision="PASS"
+          trustScore={84}
+          holder="Specimen holder"
+          sessionId="00000000"
+          issuedAt={new Date(2026, 9, 8)}
+          checks={[
+            { key: "image_agent", score: 92, risk: "LOW" },
+            { key: "video_agent", score: 86, risk: "LOW" },
+            { key: "voice_agent", score: 81, risk: "LOW" },
+            { key: "behavior_agent", score: 74, risk: "MEDIUM" },
+          ]}
+        />
+      </section>
+
+      {/* Checks */}
+      <section className="border-t border-rule bg-sheet">
+        <div className="max-w-6xl mx-auto px-6 py-16 md:py-20">
+          <h2 className="text-[1.75rem] md:text-[2rem] font-bold tracking-[-0.01em] text-ink max-w-2xl">
+            Four checks, each looking for a different attack
+          </h2>
+          <p className="mt-3 text-ink-soft max-w-2xl">
+            No single check is reliable on its own, so each one is listed with what it misses as well
+            as what it catches.
           </p>
 
-          {/* CTAs */}
-          <div className="fade-up stagger-4 flex flex-col sm:flex-row gap-3 justify-center items-center">
-            <Link
-              href="/verify"
-              className="btn-glow text-white px-8 py-3.5 rounded-xl text-sm font-semibold tracking-wide"
-            >
-              Start Verification
-            </Link>
-            <Link
-              href="/dashboard"
-              className="group flex items-center gap-2 text-white/30 hover:text-white/60 text-sm font-medium transition-colors duration-300 px-6 py-3.5"
-            >
-              View Dashboard
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="group-hover:translate-x-0.5 transition-transform">
-                <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </Link>
-          </div>
-
-          {/* Stats bar */}
-          <div className="fade-up stagger-5 mt-16 flex items-center justify-center gap-8 md:gap-14">
-            {[
-              { value: "4", label: "AI Agents" },
-              { value: "3", label: "Quality Gates" },
-              { value: "<5s", label: "Verification" },
-              { value: "100+", label: "Tests Passing" },
-            ].map((stat, i) => (
-              <div key={i} className="text-center">
-                <div className="text-lg md:text-xl font-bold text-white/80 font-mono">{stat.value}</div>
-                <div className="text-[10px] text-white/20 uppercase tracking-widest mt-0.5">{stat.label}</div>
-              </div>
+          {/* Small screens: one block per check */}
+          <ul className="mt-8 md:hidden border-t-2 border-ink">
+            {CHECKS.map((c) => (
+              <li key={c.name} className="py-5 border-b border-rule">
+                <div className="flex justify-between gap-4">
+                  <h3 className="font-semibold text-ink">{c.name}</h3>
+                  <span className="font-semibold figures">{c.weight}%</span>
+                </div>
+                <p className="mt-1 text-ink-soft text-[0.9375rem]">{c.how}</p>
+                <dl className="mt-3 grid grid-cols-[6.5rem_1fr] gap-x-3 gap-y-1 text-[0.9375rem]">
+                  <dt className="text-ink-faint">Catches</dt>
+                  <dd className="text-ink">{c.catches}</dd>
+                  <dt className="text-ink-faint">Doesn’t catch</dt>
+                  <dd className="text-ink-soft">{c.misses}</dd>
+                </dl>
+              </li>
             ))}
-          </div>
-        </div>
-      </section>
+          </ul>
 
-      <div className="section-line max-w-5xl mx-auto" />
-
-      {/* Problem Statement */}
-      <section className="max-w-5xl mx-auto px-6 py-20">
-        <div className="fade-up text-center mb-14">
-          <p className="text-[11px] uppercase tracking-[0.2em] text-white/20 mb-3">The Problem</p>
-          <h2 className="text-3xl md:text-4xl font-bold text-white/90 tracking-tight">
-            Single checks get fooled.
-          </h2>
-          <p className="text-white/30 mt-3 max-w-lg mx-auto text-sm leading-relaxed">
-            Photo-of-a-photo. Voice cloning. Automated bots. Each targets one weakness.
-            TrustGuard runs 4 independent checks — even if one is fooled, the others catch it.
-          </p>
-        </div>
-
-        {/* Bento Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
-          {/* Agent 1 - Large */}
-          <div className="md:col-span-4 glass glow-border shimmer-hover rounded-2xl p-7 fade-up stagger-1">
-            <div className="flex items-start justify-between mb-5">
-              <div>
-                <div className="flex items-center gap-3 mb-1">
-                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#00d4ff]/20 to-[#00d4ff]/5 flex items-center justify-center border border-[#00d4ff]/10">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#00d4ff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="3" y="3" width="18" height="18" rx="2"/>
-                      <circle cx="8.5" cy="8.5" r="1.5"/>
-                      <path d="M21 15l-5-5L5 21"/>
-                    </svg>
-                  </div>
-                  <h3 className="text-base font-semibold text-white/90">Deepfake Detection</h3>
-                </div>
-              </div>
-              <span className="text-[10px] font-mono text-[#00d4ff]/60 bg-[#00d4ff]/[0.06] px-2.5 py-1 rounded-full">
-                30% weight
-              </span>
-            </div>
-            <p className="text-sm text-white/30 leading-relaxed mb-5">
-              Vision Transformer (ViT) model trained on deepfake datasets. Analyzes pixel-level
-              patterns that distinguish real photos from AI-generated faces.
-            </p>
-            <div className="flex items-center gap-3">
-              <a
-                href="https://github.com/Ashmeet-21/trustguard/blob/master/benchmarks/RESULTS.md"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 text-[11px] bg-[#fbbf24]/[0.06] text-[#fbbf24]/80 px-3 py-1.5 rounded-lg border border-[#fbbf24]/10 hover:text-[#fbbf24] transition-colors"
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-[#fbbf24]" />
-                Open benchmark results
-              </a>
-              <span className="text-[11px] text-white/15 font-mono">HuggingFace ViT</span>
-            </div>
-          </div>
-
-          {/* Agent 2 - Small */}
-          <div className="md:col-span-2 glass glow-border shimmer-hover rounded-2xl p-7 fade-up stagger-2 flex flex-col justify-between">
-            <div>
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#7b2ff7]/20 to-[#7b2ff7]/5 flex items-center justify-center border border-[#7b2ff7]/10 mb-4">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7b2ff7" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                  <circle cx="12" cy="7" r="4"/>
-                </svg>
-              </div>
-              <h3 className="text-base font-semibold text-white/90 mb-1">Liveness</h3>
-              <span className="text-[10px] font-mono text-[#7b2ff7]/60">25% weight</span>
-            </div>
-            <div className="mt-5">
-              <p className="text-sm text-white/30 leading-relaxed mb-4">
-                6 independent checks using OpenCV + MediaPipe. Catches photo-of-photo and screen replay.
-              </p>
-              <div className="flex gap-1.5">
-                {[1,2,3,4,5,6].map(n => (
-                  <div key={n} className="w-6 h-1 rounded-full bg-[#7b2ff7]/20" />
+          <div className="mt-10 hidden md:block">
+            <table className="w-full text-left text-[0.9375rem]">
+              <thead>
+                <tr className="border-b-2 border-ink text-ink">
+                  <th scope="col" className="py-3 pr-6 font-semibold w-[22%]">Check</th>
+                  <th scope="col" className="py-3 pr-6 font-semibold w-[30%]">How it works</th>
+                  <th scope="col" className="py-3 pr-6 font-semibold">Catches</th>
+                  <th scope="col" className="py-3 pr-6 font-semibold">Doesn’t catch</th>
+                  <th scope="col" className="py-3 font-semibold text-right">Weight</th>
+                </tr>
+              </thead>
+              <tbody>
+                {CHECKS.map((c) => (
+                  <tr key={c.name} className="border-b border-rule align-top">
+                    <th scope="row" className="py-4 pr-6 font-semibold text-ink">{c.name}</th>
+                    <td className="py-4 pr-6 text-ink-soft">{c.how}</td>
+                    <td className="py-4 pr-6 text-ink">{c.catches}</td>
+                    <td className="py-4 pr-6 text-ink-soft">{c.misses}</td>
+                    <td className="py-4 text-right font-semibold figures">{c.weight}%</td>
+                  </tr>
                 ))}
-              </div>
-              <p className="text-[10px] text-white/15 mt-1.5 font-mono">6 signal checks</p>
-            </div>
-          </div>
-
-          {/* Agent 3 - Small */}
-          <div className="md:col-span-2 glass glow-border shimmer-hover rounded-2xl p-7 fade-up stagger-3 flex flex-col justify-between">
-            <div>
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#4ade80]/20 to-[#4ade80]/5 flex items-center justify-center border border-[#4ade80]/10 mb-4">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
-                  <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-                  <line x1="12" y1="19" x2="12" y2="22"/>
-                </svg>
-              </div>
-              <h3 className="text-base font-semibold text-white/90 mb-1">Voice Analysis</h3>
-              <span className="text-[10px] font-mono text-[#4ade80]/60">25% weight</span>
-            </div>
-            <div className="mt-5">
-              <p className="text-sm text-white/30 leading-relaxed mb-4">
-                HuggingFace cloud API primary, local spectral analysis fallback. Works offline.
-              </p>
-              <div className="text-[11px] text-white/15 font-mono">2-tier detection</div>
-            </div>
-          </div>
-
-          {/* Agent 4 - Large */}
-          <div className="md:col-span-4 glass glow-border shimmer-hover rounded-2xl p-7 fade-up stagger-4">
-            <div className="flex items-start justify-between mb-5">
-              <div>
-                <div className="flex items-center gap-3 mb-1">
-                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#fbbf24]/20 to-[#fbbf24]/5 flex items-center justify-center border border-[#fbbf24]/10">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M18 3a3 3 0 0 0-3 3v12a3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3H6a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3V6a3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3h12a3 3 0 0 0 3-3 3 3 0 0 0-3-3z"/>
-                    </svg>
-                  </div>
-                  <h3 className="text-base font-semibold text-white/90">Behavioral Biometrics</h3>
-                </div>
-              </div>
-              <span className="text-[10px] font-mono text-[#fbbf24]/60 bg-[#fbbf24]/[0.06] px-2.5 py-1 rounded-full">
-                20% weight
-              </span>
-            </div>
-            <p className="text-sm text-white/30 leading-relaxed mb-5">
-              Pure rule-based analysis — no ML needed. Checks typing speed (bots type &lt;30ms between keys),
-              rhythm variance, mouse speed, and path straightness.
-            </p>
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2 text-[11px] bg-[#fbbf24]/[0.06] text-[#fbbf24]/80 px-3 py-1.5 rounded-lg border border-[#fbbf24]/10">
-                Catches automated bots
-              </div>
-              <span className="text-[11px] text-white/15 font-mono">No training data needed</span>
-            </div>
+              </tbody>
+            </table>
           </div>
         </div>
       </section>
 
-      <div className="section-line max-w-5xl mx-auto" />
-
-      {/* Scoring Section */}
-      <section className="max-w-5xl mx-auto px-6 py-20">
-        <div className="fade-up text-center mb-14">
-          <p className="text-[11px] uppercase tracking-[0.2em] text-white/20 mb-3">Scoring</p>
-          <h2 className="text-3xl md:text-4xl font-bold text-white/90 tracking-tight">
-            One score. Full transparency.
-          </h2>
-        </div>
-
-        <div className="grid md:grid-cols-2 gap-3">
-          {/* Formula */}
-          <div className="glass rounded-2xl p-7 fade-up stagger-1">
-            <p className="text-[11px] uppercase tracking-[0.15em] text-white/20 mb-5">Weighted Formula</p>
-            <div className="space-y-3 font-mono text-sm">
-              {[
-                { name: "Deepfake", color: "#00d4ff", weight: "0.30" },
-                { name: "Liveness", color: "#7b2ff7", weight: "0.25" },
-                { name: "Voice", color: "#4ade80", weight: "0.25" },
-                { name: "Behavior", color: "#fbbf24", weight: "0.20" },
-              ].map((agent) => (
-                <div key={agent.name} className="flex items-center justify-between py-2 border-b border-white/[0.03]">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: agent.color, opacity: 0.7 }} />
-                    <span className="text-white/50">{agent.name}</span>
-                  </div>
-                  <span className="text-white/20">&times; {agent.weight}</span>
-                </div>
-              ))}
-              <div className="flex items-center justify-between pt-2">
-                <span className="text-white/70 font-semibold">=&nbsp; Trust Score</span>
-                <span className="text-white/40">0 &ndash; 100</span>
-              </div>
-            </div>
-            <p className="text-[11px] text-white/15 mt-4">
-              Skipped agents redistribute weight automatically.
+      {/* Decision process */}
+      <section className="border-t border-rule">
+        <div className="max-w-6xl mx-auto px-6 py-16 md:py-20 grid md:grid-cols-[18rem_1fr] gap-10 md:gap-16">
+          <div>
+            <h2 className="text-[1.75rem] md:text-[2rem] font-bold tracking-[-0.01em] text-ink">
+              How a decision is made
+            </h2>
+            <p className="mt-3 text-ink-soft">
+              The same inputs always give the same decision, and the reasons are part of the result.
             </p>
           </div>
 
-          {/* Decisions */}
-          <div className="glass rounded-2xl p-7 fade-up stagger-2">
-            <p className="text-[11px] uppercase tracking-[0.15em] text-white/20 mb-5">Decisions</p>
-            <div className="space-y-3">
-              {[
-                {
-                  decision: "PASS",
-                  range: "70+",
-                  color: "#4ade80",
-                  bg: "rgba(74, 222, 128, 0.04)",
-                  border: "rgba(74, 222, 128, 0.1)",
-                  desc: "All agents agree, no high-risk flags",
-                },
-                {
-                  decision: "REVIEW",
-                  range: "40-69",
-                  color: "#fbbf24",
-                  bg: "rgba(251, 191, 36, 0.04)",
-                  border: "rgba(251, 191, 36, 0.1)",
-                  desc: "Some concerns — 1 agent flagged HIGH risk",
-                },
-                {
-                  decision: "FAIL",
-                  range: "<40",
-                  color: "#f87171",
-                  bg: "rgba(248, 113, 113, 0.04)",
-                  border: "rgba(248, 113, 113, 0.1)",
-                  desc: "Critical risk, or 2+ agents flagged — likely fake",
-                },
-              ].map((d) => (
-                <div
-                  key={d.decision}
-                  className="flex items-center gap-4 rounded-xl p-4 transition-colors duration-300"
-                  style={{ background: d.bg, border: `1px solid ${d.border}` }}
+          <ol className="border-l-2 border-ink">
+            {STEPS.map((s, i) => (
+              <li key={s.title} className="relative pl-8 pb-8 last:pb-0">
+                <span
+                  className="absolute -left-[0.9rem] top-0 w-7 h-7 rounded-full bg-paper border-2 border-ink text-sm font-bold flex items-center justify-center figures"
+                  aria-hidden="true"
                 >
-                  <div
-                    className="text-xs font-bold font-mono px-2.5 py-1 rounded-md"
-                    style={{ color: d.color, background: `${d.color}10` }}
-                  >
-                    {d.decision}
-                  </div>
-                  <div className="flex-1">
-                    <div className="text-sm text-white/50">{d.desc}</div>
-                  </div>
-                  <span className="text-xs font-mono text-white/20">{d.range}</span>
-                </div>
-              ))}
+                  {i + 1}
+                </span>
+                <h3 className="font-semibold text-ink text-lg leading-7">{s.title}</h3>
+                <p className="mt-1 text-ink-soft max-w-[60ch]">{s.body}</p>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </section>
+
+      {/* Accuracy */}
+      <section id="accuracy" className="border-t border-rule bg-sheet scroll-mt-4">
+        <div className="max-w-6xl mx-auto px-6 py-16 md:py-20 grid lg:grid-cols-2 gap-10 lg:gap-16">
+          <div>
+            <h2 className="text-[1.75rem] md:text-[2rem] font-bold tracking-[-0.01em] text-ink">
+              Measured, not claimed
+            </h2>
+            <div className="mt-4 space-y-4 text-ink-soft max-w-[60ch]">
+              <p>
+                The first face model advertised 99% accuracy — on its own training data. On 199 faces
+                from image generators it had never seen, it caught 1 fake out of 99.
+              </p>
+              <p>
+                TrustGuard now uses the best of eight models tested on exactly the same images. It
+                is much better, and still not perfect: face swaps, where most of the photo is real,
+                are almost never caught. That is why the other three checks exist.
+              </p>
             </div>
+            <p className="mt-6 flex flex-wrap gap-x-6 gap-y-2">
+              <a className="link" href={BENCHMARK_URL} target="_blank" rel="noopener noreferrer">
+                Full benchmark results
+              </a>
+              <a className="link" href={COMPARISON_URL} target="_blank" rel="noopener noreferrer">
+                All eight models compared
+              </a>
+            </p>
+          </div>
+
+          <div className="self-start">
+            <table className="w-full text-left text-[0.9375rem]">
+              <caption className="text-left text-sm text-ink-faint pb-3">
+                DeepFakeFace dataset, 100 real and 99 fake faces, not used in training.
+              </caption>
+              <thead>
+                <tr className="border-b-2 border-ink">
+                  <th scope="col" className="py-3 pr-4 font-semibold">Face check</th>
+                  <th scope="col" className="py-3 pr-4 font-semibold text-right">First model</th>
+                  <th scope="col" className="py-3 font-semibold text-right">Current model</th>
+                </tr>
+              </thead>
+              <tbody className="figures">
+                <tr className="border-b border-rule">
+                  <th scope="row" className="py-3 pr-4 font-normal text-ink">Fakes caught</th>
+                  <td className="py-3 pr-4 text-right text-ink-soft">1%</td>
+                  <td className="py-3 text-right font-semibold">60%</td>
+                </tr>
+                <tr className="border-b border-rule">
+                  <th scope="row" className="py-3 pr-4 font-normal text-ink">Real people wrongly flagged</th>
+                  <td className="py-3 pr-4 text-right text-ink-soft">1%</td>
+                  <td className="py-3 text-right font-semibold">0%</td>
+                </tr>
+                <tr className="border-b border-rule">
+                  <th scope="row" className="py-3 pr-4 font-normal text-ink">
+                    AUC <span className="text-ink-faint">(0.5 is guessing)</span>
+                  </th>
+                  <td className="py-3 pr-4 text-right text-ink-soft">0.41</td>
+                  <td className="py-3 text-right font-semibold">0.88</td>
+                </tr>
+                <tr className="border-b border-rule">
+                  <th scope="row" className="py-3 pr-4 font-normal text-ink">AI-generated faces caught</th>
+                  <td className="py-3 pr-4 text-right text-ink-soft">3%</td>
+                  <td className="py-3 text-right font-semibold">100%</td>
+                </tr>
+                <tr className="border-b border-rule">
+                  <th scope="row" className="py-3 pr-4 font-normal text-ink">Face swaps caught</th>
+                  <td className="py-3 pr-4 text-right text-ink-soft">0%</td>
+                  <td className="py-3 text-right font-semibold text-fail">3%</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </section>
 
-      <div className="section-line max-w-5xl mx-auto" />
-
-      {/* How It Works */}
-      <section className="max-w-5xl mx-auto px-6 py-20">
-        <div className="fade-up text-center mb-14">
-          <p className="text-[11px] uppercase tracking-[0.2em] text-white/20 mb-3">Process</p>
-          <h2 className="text-3xl md:text-4xl font-bold text-white/90 tracking-tight">
-            Three inputs. Four agents. One score.
-          </h2>
-        </div>
-
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {[
-            {
-              step: "01",
-              title: "Selfie",
-              desc: "Camera capture or upload. Face validated before proceeding.",
-              color: "#00d4ff",
-            },
-            {
-              step: "02",
-              title: "Voice",
-              desc: "Read a random phrase. Short/silent recordings rejected.",
-              color: "#7b2ff7",
-            },
-            {
-              step: "03",
-              title: "Typing",
-              desc: "Type a sentence. Keystroke timing + mouse patterns tracked.",
-              color: "#4ade80",
-            },
-            {
-              step: "04",
-              title: "Score",
-              desc: "Trust score, decision, per-agent breakdown, and audit trail.",
-              color: "#fbbf24",
-            },
-          ].map((s, i) => (
-            <div key={i} className={`glass shimmer-hover rounded-2xl p-6 text-center fade-up stagger-${i + 1}`}>
-              <div
-                className="text-3xl font-bold font-mono mb-3"
-                style={{ color: s.color, opacity: 0.15 }}
-              >
-                {s.step}
-              </div>
-              <h3 className="text-sm font-semibold text-white/80 mb-2">{s.title}</h3>
-              <p className="text-[12px] text-white/25 leading-relaxed">{s.desc}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <div className="section-line max-w-5xl mx-auto" />
-
-      {/* Tech Stack */}
-      <section className="max-w-5xl mx-auto px-6 py-20">
-        <div className="fade-up text-center mb-10">
-          <p className="text-[11px] uppercase tracking-[0.2em] text-white/20 mb-3">Stack</p>
-          <h2 className="text-2xl font-bold text-white/90 tracking-tight">Built With</h2>
-        </div>
-
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 fade-up">
-          {[
-            { name: "FastAPI", detail: "Python backend", color: "#009688" },
-            { name: "Next.js 16", detail: "React frontend", color: "#ffffff" },
-            { name: "PyTorch + ViT", detail: "Deepfake model", color: "#ee4c2c" },
-            { name: "MediaPipe", detail: "Face detection", color: "#4285f4" },
-            { name: "SQLAlchemy", detail: "Database ORM", color: "#d71f00" },
-            { name: "HuggingFace", detail: "ML model hub", color: "#ff9d00" },
-            { name: "Tailwind CSS", detail: "UI styling", color: "#38bdf8" },
-            { name: "pytest", detail: "90 tests passing", color: "#4ade80" },
-          ].map((t, i) => (
-            <div
-              key={i}
-              className="glass rounded-xl p-4 text-center hover:bg-white/[0.03] transition-colors"
-            >
-              <p className="text-xs font-semibold font-mono" style={{ color: t.color, opacity: 0.7 }}>
-                {t.name}
-              </p>
-              <p className="text-[10px] text-white/15 mt-1">{t.detail}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <div className="section-line max-w-5xl mx-auto" />
-
-      {/* CTA */}
-      <section className="max-w-5xl mx-auto px-6 py-24 text-center">
-        <div className="fade-up">
-          <h2 className="text-3xl md:text-4xl font-bold text-white/90 tracking-tight mb-4">
-            Ready to verify?
-          </h2>
-          <p className="text-white/25 text-sm mb-8 max-w-md mx-auto">
-            Selfie, voice, behavior — see your trust score in under 5 seconds.
-          </p>
-          <Link
-            href="/verify"
-            className="btn-glow text-white px-10 py-4 rounded-xl text-sm font-semibold tracking-wide inline-block"
-          >
-            Start Verification
+      {/* Closing */}
+      <section className="border-t border-rule">
+        <div className="max-w-6xl mx-auto px-6 py-16 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div>
+            <h2 className="text-2xl font-bold text-ink">Try it with your own camera</h2>
+            <p className="mt-1 text-ink-soft">It takes about a minute: one selfie, one sentence read aloud, one sentence typed.</p>
+          </div>
+          <Link href="/verify" className="btn self-start md:self-auto">
+            Start a verification
           </Link>
         </div>
       </section>
-
-      {/* Footer */}
-      <footer className="border-t border-white/[0.03] py-6 text-center">
-        <p className="text-[11px] text-white/15">
-          TrustGuard v1.0.0 &middot; Built by Ashmeet Singh &middot;{" "}
-          <a href={`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/docs`} className="text-white/20 hover:text-white/40 transition-colors">
-            API Docs
-          </a>
-        </p>
-      </footer>
-    </div>
+    </>
   );
 }

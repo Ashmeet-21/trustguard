@@ -359,92 +359,46 @@ export default function AudioRecorder({ onRecording, onReset }: Props) {
   const speechSupported = typeof window !== "undefined" && getSpeechRecognition() !== null;
 
   return (
-    <div className="space-y-4">
-      <div className="bg-[#0d0520] border border-[#2d1b69] rounded-xl p-4 text-center">
-        <p className="text-xs text-[#999] mb-2 uppercase tracking-wider">
-          Please read this aloud
-        </p>
-        <p className="text-lg text-white font-medium">&ldquo;{phrase}&rdquo;</p>
+    <div className="space-y-5">
+      <blockquote className="border-l-[3px] border-seal bg-seal-tint/50 px-5 py-4 rounded-r-[4px]">
+        <p className="text-xl leading-snug text-ink font-medium">{phrase}</p>
         {speechSupported && (
-          <p className="text-xs text-[#555] mt-2">
-            Your speech will be checked against the phrase above
-          </p>
+          <p className="mt-2 text-sm text-ink-faint">Your words are compared with this sentence.</p>
         )}
+      </blockquote>
+
+      <div aria-live="polite" className="space-y-3 empty:hidden">
+        {error && <p className="note note-fail"><span>{error}</span></p>}
+        {warning && !error && <p className="note note-review"><span>{warning}</span></p>}
       </div>
 
-      {error && (
-        <div className="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg p-3 text-xs">
-          {error}
-        </div>
-      )}
-
-      {warning && !error && (
-        <div className="bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 rounded-lg p-3 text-xs">
-          {warning}
-        </div>
-      )}
-
       {recorded ? (
-        <div className="bg-[#0d2e1a] border border-[#166534] rounded-xl p-4 text-center">
-          <div className="text-2xl mb-2">&#9989;</div>
-          <p className="text-[#4ade80] font-medium">
-            Voice sample recorded ({timer}s)
+        <div className="flex flex-wrap items-center gap-3">
+          <p className="note note-pass flex-1 min-w-[14rem]">
+            <span>Recording saved ({timer} seconds).</span>
           </p>
-          <div className="flex items-center justify-center gap-4 mt-3">
-            <button
-              onClick={playing ? stopPlayback : playRecording}
-              className="flex items-center gap-1.5 text-sm text-[#00d4ff] hover:text-white border border-[#00d4ff]/30 px-4 py-1.5 rounded-lg transition"
-            >
-              {playing ? (
-                <>
-                  <span>&#9724;</span> Stop
-                </>
-              ) : (
-                <>
-                  <span>&#9654;</span> Listen
-                </>
-              )}
-            </button>
-            <button
-              onClick={reset}
-              className="text-xs text-[#666] hover:text-white underline"
-            >
-              Record again
-            </button>
-          </div>
+          <button onClick={playing ? stopPlayback : playRecording} className="btn btn-quiet">
+            {playing ? "Stop playback" : "Play it back"}
+          </button>
+          <button onClick={reset} className="btn btn-quiet">Record again</button>
         </div>
       ) : recording ? (
-        <div className="text-center space-y-3">
-          <div className="flex items-center justify-center gap-2">
-            <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
-            <span className="text-red-400 text-sm font-medium">
-              Recording... {timer}s
-            </span>
-          </div>
-          {timer < MIN_RECORDING_SECONDS && (
-            <p className="text-xs text-[#666]">
-              Keep speaking... minimum {MIN_RECORDING_SECONDS}s required
-            </p>
-          )}
-          <button
-            onClick={stopRecording}
-            disabled={timer < MIN_RECORDING_SECONDS}
-            className="bg-red-500/20 text-red-400 border border-red-500/30 px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-red-500/30 transition disabled:opacity-30 disabled:cursor-not-allowed"
-          >
-            Stop Recording
+        <div className="flex flex-wrap items-center gap-4">
+          <button onClick={stopRecording} disabled={timer < MIN_RECORDING_SECONDS} className="btn">
+            Stop recording
           </button>
+          <p className="flex items-center gap-2 text-ink figures">
+            <span className="w-2.5 h-2.5 rounded-full bg-fail motion-safe:animate-pulse" aria-hidden="true" />
+            Recording: {timer} s
+            {timer < MIN_RECORDING_SECONDS && (
+              <span className="text-ink-faint"> — keep going, at least {MIN_RECORDING_SECONDS} seconds</span>
+            )}
+          </p>
         </div>
       ) : (
-        <div className="text-center">
-          <button
-            onClick={startRecording}
-            className="gradient-bg text-white px-6 py-2.5 rounded-lg text-sm font-medium hover:opacity-90 transition"
-          >
-            Start Recording
-          </button>
-          <p className="text-xs text-[#666] mt-2">
-            Record at least {MIN_RECORDING_SECONDS} seconds — read the phrase above clearly
-          </p>
+        <div className="flex flex-wrap items-center gap-4">
+          <button onClick={startRecording} className="btn">Start recording</button>
+          <p className="text-sm text-ink-faint">Read the whole sentence. At least {MIN_RECORDING_SECONDS} seconds.</p>
         </div>
       )}
     </div>

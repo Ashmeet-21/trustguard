@@ -4,11 +4,31 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/AuthContext";
 
+type Mode = "login" | "register";
+
+function Field({
+  id, label, hint, ...input
+}: { id: string; label: string; hint?: string } & React.InputHTMLAttributes<HTMLInputElement>) {
+  return (
+    <div>
+      <label htmlFor={id} className="block text-sm font-medium text-ink mb-1.5">
+        {label}
+      </label>
+      <input id={id} className="field" aria-describedby={hint ? `${id}-hint` : undefined} {...input} />
+      {hint && (
+        <p id={`${id}-hint`} className="mt-1.5 text-sm text-ink-faint">
+          {hint}
+        </p>
+      )}
+    </div>
+  );
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const { login, register, user } = useAuth();
 
-  const [tab, setTab] = useState<"login" | "register">("login");
+  const [mode, setMode] = useState<Mode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -16,210 +36,82 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // If already logged in, redirect
   useEffect(() => {
     if (user) router.replace("/verify");
   }, [user, router]);
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const switchMode = (next: Mode) => {
+    setMode(next);
     setError(null);
-    setSubmitting(true);
-    try {
-      await login(email, password);
-      router.push("/verify");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed");
-    } finally {
-      setSubmitting(false);
-    }
   };
 
-  const handleRegister = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-
-    if (password !== confirmPassword) {
-      setError("Passwords do not match");
+    if (mode === "register" && password !== confirmPassword) {
+      setError("The two passwords don’t match.");
       return;
     }
-
     setSubmitting(true);
     try {
-      await register(email, password, fullName);
+      if (mode === "login") await login(email, password);
+      else await register(email, password, fullName);
       router.push("/verify");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Registration failed");
+      setError(err instanceof Error ? err.message : mode === "login" ? "Sign-in failed." : "Account could not be created.");
     } finally {
       setSubmitting(false);
     }
   };
 
+  const isLogin = mode === "login";
+
   return (
-    <div className="min-h-[80vh] flex items-center justify-center px-6">
-      <div className="w-full max-w-md fade-up">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <div className="relative w-12 h-12 mx-auto mb-4">
-            <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-[#00d4ff] to-[#7b2ff7] opacity-80" />
-            <div className="absolute inset-[2px] rounded-[10px] bg-[#050508] flex items-center justify-center">
-              <span className="text-sm font-bold gradient-text">TG</span>
-            </div>
-          </div>
-          <h1 className="text-2xl font-bold text-white/90 tracking-tight">
-            {tab === "login" ? "Welcome back" : "Create account"}
-          </h1>
-          <p className="text-white/25 text-sm mt-1">
-            {tab === "login"
-              ? "Sign in to access your verification history"
-              : "Get started with TrustGuard"}
-          </p>
-        </div>
+    <div className="max-w-6xl mx-auto px-6 py-14 md:py-20 grid md:grid-cols-[1fr_26rem] gap-12 md:gap-20">
+      <div className="max-w-md md:pt-4">
+        <h1 className="text-[2rem] md:text-[2.5rem] font-bold leading-tight tracking-[-0.02em] text-ink">
+          {isLogin ? "Sign in to run a verification" : "Create an account"}
+        </h1>
+        <p className="mt-4 text-ink-soft">
+          An account keeps your verification records private to you. Your selfie and voice sample are
+          deleted from TrustGuard’s server as soon as the checks finish, and only the scores and
+          decision are kept. The face check sends your selfie to a model hosted on HuggingFace.
+        </p>
+      </div>
 
-        {/* Tab Toggle */}
-        <div className="flex rounded-xl p-1 mb-6 bg-white/[0.03] border border-white/[0.06]">
-          <button
-            onClick={() => { setTab("login"); setError(null); }}
-            className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
-              tab === "login"
-                ? "bg-white/[0.08] text-white border border-white/[0.08]"
-                : "text-white/30 hover:text-white/50"
-            }`}
-          >
-            Login
-          </button>
-          <button
-            onClick={() => { setTab("register"); setError(null); }}
-            className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
-              tab === "register"
-                ? "bg-white/[0.08] text-white border border-white/[0.08]"
-                : "text-white/30 hover:text-white/50"
-            }`}
-          >
-            Register
-          </button>
-        </div>
-
-        {/* Error */}
-        {error && (
-          <div
-            className="glass rounded-xl p-3 mb-4 text-sm"
-            style={{
-              background: "rgba(248, 113, 113, 0.04)",
-              borderColor: "rgba(248, 113, 113, 0.15)",
-            }}
-          >
-            <span className="text-[#f87171]/80">{error}</span>
-          </div>
-        )}
-
-        {/* Form */}
-        <div className="glass rounded-2xl p-6">
-          {tab === "login" ? (
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div>
-                <label className="text-[11px] uppercase tracking-[0.15em] text-white/20 mb-1.5 block">
-                  Email
-                </label>
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full bg-white/[0.03] border border-white/[0.06] rounded-xl px-4 py-3 text-sm text-white/80 placeholder-white/15 focus:outline-none focus:border-[#00d4ff]/30 transition-colors"
-                  placeholder="you@example.com"
-                />
-              </div>
-              <div>
-                <label className="text-[11px] uppercase tracking-[0.15em] text-white/20 mb-1.5 block">
-                  Password
-                </label>
-                <input
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full bg-white/[0.03] border border-white/[0.06] rounded-xl px-4 py-3 text-sm text-white/80 placeholder-white/15 focus:outline-none focus:border-[#00d4ff]/30 transition-colors"
-                  placeholder="Enter your password"
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={submitting}
-                className="w-full btn-glow text-white py-3 rounded-xl text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed mt-2"
-              >
-                {submitting ? "Signing in..." : "Sign In"}
-              </button>
-            </form>
-          ) : (
-            <form onSubmit={handleRegister} className="space-y-4">
-              <div>
-                <label className="text-[11px] uppercase tracking-[0.15em] text-white/20 mb-1.5 block">
-                  Full Name
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  className="w-full bg-white/[0.03] border border-white/[0.06] rounded-xl px-4 py-3 text-sm text-white/80 placeholder-white/15 focus:outline-none focus:border-[#00d4ff]/30 transition-colors"
-                  placeholder="Your full name"
-                />
-              </div>
-              <div>
-                <label className="text-[11px] uppercase tracking-[0.15em] text-white/20 mb-1.5 block">
-                  Email
-                </label>
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full bg-white/[0.03] border border-white/[0.06] rounded-xl px-4 py-3 text-sm text-white/80 placeholder-white/15 focus:outline-none focus:border-[#00d4ff]/30 transition-colors"
-                  placeholder="you@example.com"
-                />
-              </div>
-              <div>
-                <label className="text-[11px] uppercase tracking-[0.15em] text-white/20 mb-1.5 block">
-                  Password
-                </label>
-                <input
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full bg-white/[0.03] border border-white/[0.06] rounded-xl px-4 py-3 text-sm text-white/80 placeholder-white/15 focus:outline-none focus:border-[#00d4ff]/30 transition-colors"
-                  placeholder="Min 12 chars, upper, lower, digit, special"
-                />
-              </div>
-              <div>
-                <label className="text-[11px] uppercase tracking-[0.15em] text-white/20 mb-1.5 block">
-                  Confirm Password
-                </label>
-                <input
-                  type="password"
-                  required
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full bg-white/[0.03] border border-white/[0.06] rounded-xl px-4 py-3 text-sm text-white/80 placeholder-white/15 focus:outline-none focus:border-[#00d4ff]/30 transition-colors"
-                  placeholder="Re-enter your password"
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={submitting}
-                className="w-full btn-glow text-white py-3 rounded-xl text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed mt-2"
-              >
-                {submitting ? "Creating account..." : "Create Account"}
-              </button>
-            </form>
+      <div className="sheet p-6 sm:p-8">
+        <form onSubmit={handleSubmit} className="space-y-5" noValidate={false}>
+          {error && (
+            <p className="note note-fail" role="alert">
+              <span>{error}</span>
+            </p>
           )}
-        </div>
 
-        <p className="text-center text-[11px] text-white/10 mt-6">
-          {tab === "login"
-            ? "Don't have an account? Click Register above."
-            : "Password: 12+ chars with uppercase, lowercase, digit, and special character."}
+          {!isLogin && (
+            <Field id="name" label="Full name" type="text" required autoComplete="name"
+              value={fullName} onChange={(e) => setFullName(e.target.value)} />
+          )}
+          <Field id="email" label="Email" type="email" required autoComplete="email"
+            value={email} onChange={(e) => setEmail(e.target.value)} />
+          <Field id="password" label="Password" type="password" required
+            autoComplete={isLogin ? "current-password" : "new-password"}
+            hint={isLogin ? undefined : "At least 12 characters, with an uppercase letter, a lowercase letter, a number and a symbol."}
+            value={password} onChange={(e) => setPassword(e.target.value)} />
+          {!isLogin && (
+            <Field id="confirm" label="Confirm password" type="password" required autoComplete="new-password"
+              value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
+          )}
+
+          <button type="submit" disabled={submitting} className="btn w-full">
+            {submitting ? (isLogin ? "Signing in…" : "Creating account…") : isLogin ? "Sign in" : "Create account"}
+          </button>
+        </form>
+
+        <p className="mt-6 pt-5 border-t border-rule text-sm text-ink-soft">
+          {isLogin ? "No account yet? " : "Already have an account? "}
+          <button type="button" className="link font-medium" onClick={() => switchMode(isLogin ? "register" : "login")}>
+            {isLogin ? "Create one" : "Sign in"}
+          </button>
         </p>
       </div>
     </div>

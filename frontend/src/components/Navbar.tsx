@@ -4,98 +4,76 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/AuthContext";
 
+const LINKS = [
+  { href: "/verify", label: "Verify" },
+  { href: "/dashboard", label: "Dashboard" },
+];
+
+/** Wordmark: a small seal (two concentric rings + check) next to the name */
+function Seal() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="10.5" fill="none" stroke="currentColor" strokeWidth="1.5" />
+      <circle cx="12" cy="12" r="7.5" fill="none" stroke="currentColor" strokeWidth="0.75" strokeDasharray="1.2 1.6" />
+      <path d="M8.5 12.2l2.3 2.3 4.7-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export default function Navbar() {
   const pathname = usePathname();
   const { user, loading, logout } = useAuth();
 
-  const links = [
-    { href: "/", label: "Home" },
-    { href: "/verify", label: "Verify" },
-    { href: "/dashboard", label: "Dashboard" },
-  ];
-
   return (
-    <nav className="sticky top-0 z-50 border-b border-white/[0.04]">
-      <div className="absolute inset-0 bg-[#050508]/80 backdrop-blur-2xl" />
-      <div className="relative flex items-center justify-between px-8 py-3.5 max-w-7xl mx-auto">
-        <Link href="/" className="flex items-center gap-2.5 group">
-          {/* Animated logo mark */}
-          <div className="relative w-8 h-8">
-            <div className="absolute inset-0 rounded-lg bg-gradient-to-br from-[#00d4ff] to-[#7b2ff7] opacity-80 group-hover:opacity-100 transition-opacity" />
-            <div className="absolute inset-[2px] rounded-[6px] bg-[#050508] flex items-center justify-center">
-              <span className="text-xs font-bold gradient-text">TG</span>
-            </div>
-          </div>
-          <span className="text-base font-semibold text-white/90 tracking-tight">
-            TrustGuard
-          </span>
+    <header className="border-b border-rule bg-paper">
+      <nav className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between gap-4" aria-label="Main">
+        <Link href="/" className="flex items-center gap-2 text-seal font-semibold text-[1.0625rem] tracking-tight">
+          <Seal />
+          <span className="text-ink">TrustGuard</span>
         </Link>
 
-        <div className="flex items-center gap-1">
-          {links.map((link) => {
-            const isActive = pathname === link.href;
+        <div className="flex items-center gap-1 sm:gap-2 text-[0.9375rem]">
+          {LINKS.map((link) => {
+            const active = pathname === link.href;
             return (
               <Link
                 key={link.href}
                 href={link.href}
-                className={`relative px-4 py-2 rounded-lg text-[13px] font-medium transition-all duration-300 ${
-                  isActive
-                    ? "text-white"
-                    : "text-white/40 hover:text-white/70"
+                aria-current={active ? "page" : undefined}
+                className={`px-3 py-2 rounded ${
+                  active ? "text-ink font-semibold" : "text-ink-soft hover:text-ink"
                 }`}
               >
-                {isActive && (
-                  <span className="absolute inset-0 rounded-lg bg-white/[0.06] border border-white/[0.08]" />
-                )}
-                <span className="relative">{link.label}</span>
+                {link.label}
               </Link>
             );
           })}
-          <div className="w-px h-5 bg-white/[0.06] mx-2" />
-          <a
-            href={`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/docs`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="px-3.5 py-1.5 rounded-lg text-[13px] font-medium text-white/30 hover:text-white/60 transition-all duration-300 flex items-center gap-1.5"
-          >
-            API
-            <svg width="10" height="10" viewBox="0 0 12 12" fill="none" className="opacity-50">
-              <path d="M3.5 1.5H10.5V8.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M10.5 1.5L1.5 10.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-            </svg>
-          </a>
-          <div className="w-px h-5 bg-white/[0.06] mx-2" />
-          {!loading && (
-            user ? (
+
+          <span className="w-px h-5 bg-rule mx-1 sm:mx-2" aria-hidden="true" />
+
+          {!loading &&
+            (user ? (
               <div className="flex items-center gap-3">
-                <span className="text-[12px] text-white/30 max-w-[140px] truncate">
+                <span className="hidden md:inline text-sm text-ink-faint max-w-[12rem] truncate">
                   {user.full_name || user.email}
                 </span>
-                <button
-                  onClick={logout}
-                  className="px-3.5 py-1.5 rounded-lg text-[13px] font-medium text-white/30 hover:text-white/60 transition-all duration-300 border border-white/[0.06] hover:border-white/[0.12]"
-                >
-                  Logout
+                <button onClick={logout} className="px-3 py-2 rounded text-ink-soft hover:text-ink">
+                  Sign out
                 </button>
               </div>
             ) : (
               <Link
                 href="/login"
-                className={`relative px-4 py-2 rounded-lg text-[13px] font-medium transition-all duration-300 ${
-                  pathname === "/login"
-                    ? "text-white"
-                    : "text-white/40 hover:text-white/70"
+                aria-current={pathname === "/login" ? "page" : undefined}
+                className={`px-3 py-2 rounded ${
+                  pathname === "/login" ? "text-ink font-semibold" : "text-ink-soft hover:text-ink"
                 }`}
               >
-                {pathname === "/login" && (
-                  <span className="absolute inset-0 rounded-lg bg-white/[0.06] border border-white/[0.08]" />
-                )}
-                <span className="relative">Login</span>
+                Sign in
               </Link>
-            )
-          )}
+            ))}
         </div>
-      </div>
-    </nav>
+      </nav>
+    </header>
   );
 }

@@ -49,10 +49,11 @@ docker-compose up --build                       # both services
 - Tests use the `auth_headers` fixture in `tests/conftest.py`.
 
 ## Frontend (`frontend/`, Next.js 16.1.6, React 19, Tailwind v4, TypeScript)
-- Pages: `/` landing, `/login`, `/verify` (5-step wizard, auth), `/dashboard` (analytics, auth).
-- Components: CameraCapture, AudioRecorder, BehavioralTracker, TrustScoreGauge, AgentStatusCard, StepWizard, Navbar.
+- Pages: `/` landing, `/login`, `/verify` (photo → voice → typing → result, auth), `/dashboard` (analytics, auth).
+- Components: CameraCapture, AudioRecorder, BehavioralTracker, StepWizard (vertical), Navbar, **VerificationDocument** (result rendered as an ID-document data page with photo, ink-stamp decision, per-check readings and a 2×44-char MRZ that encodes the result; also used as the landing-page specimen).
 - `lib/api.ts` typed client, `lib/AuthContext.tsx` auth state. API base via `NEXT_PUBLIC_API_URL` / next.config rewrites.
-- Dark theme, gradient #00d4ff → #7b2ff7. Next 16 gotcha: `useRef<T>(undefined)` needs an initial value.
+- **Design system (redesigned 2026-10-08, "identity document" direction)** — tokens in `globals.css` `@theme`: paper #eef1ef, sheet #f9faf8, ink #16233a, one action colour seal #23408e, pass/review/fail ink colours. Fonts: Schibsted Grotesk (everything) + IBM Plex Mono (MRZ + session IDs only). Utility classes: `.btn`, `.btn-quiet`, `.link`, `.field`, `.sheet`, `.note note-pass|review|fail`, `.mrz`, `.figures` (tabular nums). Rules: light theme only, no gradients/glass/glow, no all-caps labels, left-aligned, only motion = MRZ print-in on result (respects reduced motion). Landing checks table lists what each check *doesn't* catch — keep that honesty.
+- Dashboard no longer shows filenames (privacy). Next 16 gotcha: `useRef<T>(undefined)` needs an initial value.
 
 ## Deploy / CI
 - **LIVE** (verified 2026-10-08): frontend https://steady-semolina-01c7cf.netlify.app (Netlify site id c8bed503-…), backend https://trustguard-bgba.onrender.com (Render free tier, auto-deploys `master`, sleeps when idle ~1 min cold start).

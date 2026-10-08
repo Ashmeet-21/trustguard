@@ -115,86 +115,69 @@ export default function CameraCapture({ onCapture, onReset }: Props) {
   };
 
   return (
-    <div className="space-y-4">
+    <div>
       {captured ? (
-        <div className="relative">
+        <div className="flex flex-col sm:flex-row gap-5 items-start">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={captured}
-            alt="Captured"
-            className="w-full rounded-xl border border-[#222]"
+            alt="Your selfie"
+            className="w-full sm:w-64 aspect-[4/3] object-cover rounded-[4px] border border-rule"
           />
-          <button
-            onClick={retake}
-            className="absolute top-2 right-2 bg-[#222] hover:bg-[#333] text-white rounded-lg px-3 py-1 text-xs"
-          >
-            Retake
+          <button onClick={retake} className="btn btn-quiet">
+            Take a different photo
           </button>
         </div>
       ) : streaming ? (
-        <div className="relative">
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted
-            className="w-full rounded-xl border border-[#222]"
-            style={{ transform: "scaleX(-1)" }}
-          />
-          {/* Face oval guide overlay */}
-          <div className="absolute inset-0 pointer-events-none rounded-xl overflow-hidden">
-            <svg className="w-full h-full" viewBox="0 0 640 480" preserveAspectRatio="xMidYMid slice">
+        <div>
+          <div className="relative rounded-[4px] overflow-hidden border border-rule bg-ink">
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className="w-full block"
+              style={{ transform: "scaleX(-1)" }}
+            />
+            {/* Face guide: everything outside the oval is dimmed */}
+            <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 640 480" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
               <defs>
                 <mask id="faceOvalMask">
                   <rect width="640" height="480" fill="white" />
-                  <ellipse cx="320" cy="220" rx="140" ry="180" fill="black" />
+                  <ellipse cx="320" cy="225" rx="140" ry="180" fill="black" />
                 </mask>
               </defs>
-              <rect width="640" height="480" fill="rgba(0,0,0,0.35)" mask="url(#faceOvalMask)" />
-              <ellipse cx="320" cy="220" rx="140" ry="180" fill="none" stroke="#00d4ff" strokeWidth="2.5" strokeDasharray="10 5" />
+              <rect width="640" height="480" fill="rgba(22,35,58,0.45)" mask="url(#faceOvalMask)" />
+              <ellipse cx="320" cy="225" rx="140" ry="180" fill="none" stroke="#f9faf8" strokeWidth="2" />
             </svg>
-            <p className="absolute bottom-16 left-0 right-0 text-center text-xs text-white/90 font-medium drop-shadow-lg">
-              Position your full face within the oval
-            </p>
           </div>
-          <button
-            onClick={takeSnapshot}
-            className="absolute bottom-4 left-1/2 -translate-x-1/2 gradient-bg text-white rounded-full w-14 h-14 flex items-center justify-center text-2xl hover:opacity-90 transition shadow-lg"
-          >
-            &#128247;
-          </button>
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <button onClick={takeSnapshot} className="btn">Take photo</button>
+            <button onClick={stopCamera} className="btn btn-quiet">Cancel</button>
+            <p className="text-sm text-ink-faint">Fit your whole face inside the oval.</p>
+          </div>
         </div>
       ) : (
-        <div className="border-2 border-dashed border-[#333] rounded-xl p-8 text-center">
-          <div className="text-4xl mb-3">📷</div>
-          <p className="text-[#666] text-sm mb-1">
-            Take a selfie or upload a photo
-          </p>
-          <p className="text-[#555] text-xs mb-4">
-            Make sure your full face is visible — no half face or cropped photos
-          </p>
+        <div className="border border-dashed border-rule-strong rounded-[4px] bg-paper/60 px-6 py-10 text-center">
+          <svg className="mx-auto text-ink-faint" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3" />
+            <circle cx="12" cy="10" r="3" />
+            <path d="M7 17c.8-2.2 2.7-3.3 5-3.3s4.2 1.1 5 3.3" />
+          </svg>
+          <p className="mt-3 text-ink font-medium">Your whole face, well lit, looking at the camera</p>
+          <p className="mt-1 text-sm text-ink-faint">No sunglasses, no cropped or half-face photos.</p>
 
           {error && (
-            <div className="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg p-3 mb-4 text-xs">
-              {error}
-            </div>
+            <p className="note note-fail mt-5 text-left" role="alert"><span>{error}</span></p>
           )}
 
-          <div className="flex gap-3 justify-center">
-            <button
-              onClick={startCamera}
-              disabled={loading}
-              className="gradient-bg text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:opacity-90 transition disabled:opacity-50"
-            >
-              {loading ? "Opening Camera..." : "Open Camera"}
+          <div className="mt-6 flex flex-wrap gap-3 justify-center">
+            <button onClick={startCamera} disabled={loading} className="btn">
+              {loading ? "Opening camera…" : "Open camera"}
             </button>
-            <label className="bg-[#1a1a1a] text-white px-5 py-2.5 rounded-lg text-sm font-medium cursor-pointer hover:bg-[#222] transition border border-[#333]">
-              Upload File
-              <input
-                type="file"
-                accept="image/jpeg,image/png"
-                onChange={handleFileUpload}
-                className="hidden"
-              />
+            <label className="btn btn-quiet focus-within:outline focus-within:outline-2 focus-within:outline-seal">
+              Upload a photo
+              <input type="file" accept="image/jpeg,image/png" onChange={handleFileUpload} className="sr-only" />
             </label>
           </div>
         </div>

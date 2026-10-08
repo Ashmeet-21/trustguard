@@ -116,15 +116,15 @@ export default function BehavioralTracker({ onComplete, onReset }: Props) {
     startTimeRef.current = Date.now();
   }, []);
 
-  // Color-code each character: green=correct, red=wrong
+  // Mark each character as typed: correct = ink, wrong = red underline, not yet typed = faint
   const renderColoredTarget = () => {
     return targetPhrase.split("").map((char, i) => {
       if (i >= typedText.length) {
-        return <span key={i} className="text-[#555]">{char}</span>;
+        return <span key={i} className="text-ink-faint">{char}</span>;
       }
       const match = typedText[i].toLowerCase() === char.toLowerCase();
       return (
-        <span key={i} className={match ? "text-[#4ade80]" : "text-[#f87171] underline"}>
+        <span key={i} className={match ? "text-ink" : "text-fail underline decoration-2"}>
           {char}
         </span>
       );
@@ -132,74 +132,62 @@ export default function BehavioralTracker({ onComplete, onReset }: Props) {
   };
 
   return (
-    <div ref={containerRef} onMouseMove={handleMouseMove} className="space-y-4">
-      <div className="bg-[#0d0520] border border-[#2d1b69] rounded-xl p-4 text-center">
-        <p className="text-xs text-[#999] mb-2 uppercase tracking-wider">Type this sentence exactly</p>
-        <p className="text-lg font-medium font-mono tracking-wide">
-          {typedText.length > 0 ? renderColoredTarget() : (
-            <span className="text-white">&ldquo;{targetPhrase}&rdquo;</span>
-          )}
+    <div ref={containerRef} onMouseMove={handleMouseMove} className="space-y-5">
+      <blockquote className="border-l-[3px] border-seal bg-seal-tint/50 px-5 py-4 rounded-r-[4px]">
+        <p className="text-xl leading-snug font-medium" aria-label={targetPhrase}>
+          {typedText.length > 0 ? renderColoredTarget() : <span className="text-ink">{targetPhrase}</span>}
         </p>
-      </div>
+      </blockquote>
 
       {completed ? (
-        <div className="bg-[#0d2e1a] border border-[#166534] rounded-xl p-4 text-center">
-          <div className="text-2xl mb-2">&#9989;</div>
-          <p className="text-[#4ade80] font-medium">Behavioral data captured</p>
-          <p className="text-xs text-[#666] mt-1">
-            {keystrokesRef.current.length} keystrokes, {mouseRef.current.length} mouse points — {accuracy}% accuracy
+        <div className="flex flex-wrap items-center gap-3">
+          <p className="note note-pass flex-1 min-w-[14rem]">
+            <span>
+              Done: {keystrokesRef.current.length} keystrokes and {mouseRef.current.length} mouse points
+              recorded, {accuracy}% accurate.
+            </span>
           </p>
-          <button
-            onClick={resetTracker}
-            className="text-xs text-[#666] hover:text-white mt-2 underline"
-          >
-            Try again
-          </button>
+          <button onClick={resetTracker} className="btn btn-quiet">Type it again</button>
         </div>
       ) : (
         <div>
-          {mismatchError && (
-            <div className="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg p-3 mb-3 text-xs">
-              Text doesn&apos;t match the phrase above ({accuracy}% accuracy, need {MIN_ACCURACY}%). Please clear and try again.
-            </div>
-          )}
-
+          <label htmlFor="typing-test" className="block text-sm font-medium text-ink mb-1.5">
+            Type the sentence above
+          </label>
           <input
+            id="typing-test"
             type="text"
             value={typedText}
             onChange={handleInput}
             onKeyDown={handleKeyDown}
-            placeholder="Start typing the exact phrase here..."
-            className="w-full px-4 py-3 bg-[#111] border border-[#333] rounded-xl text-white placeholder-[#555] focus:outline-none focus:border-[#7b2ff7] transition text-sm"
+            autoComplete="off"
+            spellCheck={false}
+            className="field text-lg"
             autoFocus
           />
-          <div className="flex justify-between mt-2">
-            <span className="text-xs text-[#666]">
-              {typedText.length}/{targetPhrase.length} characters
+          <div className="mt-2 flex flex-wrap justify-between gap-2 text-sm text-ink-faint figures">
+            <span>
+              {typedText.length} of {targetPhrase.length} characters
               {typedText.length > 0 && (
-                <span className={accuracy >= MIN_ACCURACY ? " text-[#4ade80]" : accuracy >= 50 ? " text-[#fbbf24]" : " text-[#f87171]"}>
-                  {" "}({accuracy}% match)
-                </span>
+                <span className={accuracy >= MIN_ACCURACY ? "text-pass" : "text-review"}>, {accuracy}% match</span>
               )}
             </span>
-            <span className="text-xs text-[#666]">
-              Move your mouse around while typing
-            </span>
+            <span>Move your mouse as you normally would.</span>
           </div>
-          <div className="w-full h-1.5 bg-[#1a1a1a] rounded-full mt-2 overflow-hidden">
+          <div className="mt-2 h-1 bg-rule rounded-full overflow-hidden" aria-hidden="true">
             <div
-              className="h-full rounded-full gradient-bg transition-all duration-300"
+              className="h-full bg-seal transition-[width] duration-200"
               style={{ width: `${Math.min(100, (typedText.length / targetPhrase.length) * 100)}%` }}
             />
           </div>
 
           {mismatchError && (
-            <button
-              onClick={resetTracker}
-              className="mt-3 text-sm text-[#999] hover:text-white border border-[#333] px-4 py-2 rounded-lg transition"
-            >
-              Clear & Start Over
-            </button>
+            <div className="mt-4 flex flex-wrap items-center gap-3" role="alert">
+              <p className="note note-fail flex-1 min-w-[14rem]">
+                <span>That doesn’t match the sentence closely enough ({accuracy}%, needs {MIN_ACCURACY}%).</span>
+              </p>
+              <button onClick={resetTracker} className="btn btn-quiet">Clear and start again</button>
+            </div>
           )}
         </div>
       )}
