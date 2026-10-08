@@ -214,7 +214,7 @@ Runs both backend (port 8000) and frontend (port 3000).
 ## Running Tests
 
 ```bash
-# All 102 tests
+# All 104 tests
 pytest tests/ -v
 
 # By module
@@ -225,7 +225,7 @@ pytest tests/test_behavior_analyzer.py -v        # Behavior analyzer (6 tests)
 pytest tests/test_risk_engine.py -v              # Risk engine (8 tests)
 pytest tests/test_quality_gates.py -v            # Quality gates (8 tests)
 pytest tests/test_session_orchestrator.py -v     # Session orchestrator (6 tests)
-pytest tests/test_security.py -v                 # Security regressions (9 tests)
+pytest tests/test_security.py -v                 # Security regressions (11 tests)
 
 # API tests only
 pytest tests/test_api_*.py -v                    # All 38 API endpoint tests
@@ -335,7 +335,7 @@ trustguard/
 │   │       └── Providers.tsx          # Client-side provider wrapper
 │   ├── next.config.ts                # API proxy rewrites
 │   └── package.json
-├── tests/                            # 102 tests (17 test files)
+├── tests/                            # 104 tests (17 test files)
 ├── Dockerfile                        # Backend container
 ├── docker-compose.yml                # Full-stack orchestration
 ├── requirements.txt                  # Python dependencies
@@ -358,7 +358,7 @@ trustguard/
 | Auth | python-jose + passlib | JWT tokens, bcrypt password hashing |
 | Database | SQLAlchemy + SQLite | Zero setup, swappable to PostgreSQL |
 | Rate Limiting | slowapi | Per-IP request throttling |
-| Testing | pytest | 102 tests covering detectors, API, orchestration, security |
+| Testing | pytest | 104 tests covering detectors, API, orchestration, security |
 | Logging | Loguru | Structured logging with rotation |
 
 ---

@@ -58,10 +58,13 @@ class HFGateway:
                 logger.info("HF {} | model={} | latency={}ms", task, model, latency)
                 return [{"label": r.label, "score": float(r.score)} for r in result]
             except Exception as e:
-                wait = (attempt + 1) * 2
                 logger.warning("HF {} failed (attempt {}/{}): {}", task, attempt + 1, max_retries, e)
+                # 4xx (bad token, bad request) won't fix itself — only retry server errors and 429 rate limits
+                status = getattr(getattr(e, "response", None), "status_code", None)
+                if status is not None and 400 <= status < 500 and status != 429:
+                    break
                 if attempt < max_retries - 1:
-                    time.sleep(wait)
+                    time.sleep((attempt + 1) * 2)
 
         logger.error("HF Gateway: all {} retries failed for model={}", max_retries, model)
         return [{"label": "error", "score": 0}]

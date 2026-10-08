@@ -139,6 +139,25 @@ def test_api_mode_reads_single_output_model():
     assert not real["is_deepfake"] and real["risk_level"] == "LOW"
 
 
+def test_gateway_does_not_retry_bad_token():
+    """A 401 (bad HF token) fails at once instead of retrying with sleeps."""
+    from backend.core.hf_gateway import HFGateway
+
+    class Unauthorized(Exception):
+        response = type("R", (), {"status_code": 401})()
+
+    calls = []
+    class FakeClient:
+        def image_classification(self, path, model):
+            calls.append(1)
+            raise Unauthorized("401 Unauthorized")
+
+    gateway = HFGateway(token="")
+    gateway.client = FakeClient()
+    assert gateway.classify_image("x.jpg", model="m") == [{"label": "error", "score": 0}]
+    assert len(calls) == 1
+
+
 def test_crashed_agent_blocks_auto_pass(tmp_path):
     """Everything else looks perfect, but the deepfake check crashed -> REVIEW, never PASS."""
     orch = _orchestrator(deepfake=BrokenDeepfakeDetector())

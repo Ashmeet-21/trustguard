@@ -15,7 +15,7 @@ Multi-modal identity verification platform (portfolio project by Ashmeet Singh, 
 
 ## Commands (Windows, run from project root)
 ```
-venv\Scripts\python -m pytest tests/ -q        # 102 tests, ~35s (deepfake test loads ViT model)
+venv\Scripts\python -m pytest tests/ -q        # 104 tests, ~35s (deepfake test loads ViT model)
 venv\Scripts\python -m backend.main             # backend on :8000, docs at /docs
 cd frontend && npm run dev                      # frontend on :3000 (proxies /api → :8000)
 cd frontend && npm run build                    # verify frontend builds
@@ -60,7 +60,7 @@ docker-compose up --build                       # both services
   - Browser calls same-origin `/api/*` → Next.js rewrite on Netlify proxies to backend (`NEXT_PUBLIC_API_URL`).
   - `trustguard-backend.onrender.com` is a DIFFERENT, suspended service — not ours to use; render.yaml `name:` doesn't match the live one, so env vars are really managed in the Render dashboard.
   - `render.yaml` CORS now = Netlify URL (also set it in the Render dashboard).
-- **Prod deepfake check is broken (2026-10-08):** HF API rejects calls → `/detect/deepfake/image` returns 503, sessions run without image_agent. Model `dima806/...` IS live on hf-inference, so cause = HF_TOKEN in Render (invalid/expired/missing "Inference Providers" permission/out of free credits). User must fix in Render dashboard; check Render logs for "HF image_classification failed".
+- **Prod deepfake check is broken (2026-10-08):** HF API returns 401 Invalid username or password (confirmed in Render logs 2026-10-08) → `/detect/deepfake/image` returns 503, sessions run without image_agent. Model `dima806/...` IS live on hf-inference, so cause = HF_TOKEN in Render (invalid/expired/missing "Inference Providers" permission/out of free credits). User must fix in Render dashboard; check Render logs for "HF image_classification failed".
   - Before the fail-closed fix this was hidden (every image was silently called REAL).
 - Voice model `MattyB95/AST-ASVspoof2019...` is NOT served by any HF inference provider → prod voice always uses local spectral fallback.
 - `datasets/test_images/test_face.jpg` scores liveness 0.148 (SPOOF) locally and in prod → liveness thresholds need calibration (benchmark step).
@@ -87,7 +87,7 @@ docker-compose up --build                       # both services
 
 ## Polish plan (started 2026-10-08)
 1. [x] Fix stale tests + CI branch fix (commit 42f2383). CI then caught missing `scipy` in requirements.txt.
-1b. [x] Security review & cleanup (2026-10-08): 9 vulns/bugs fixed, redundant code removed, 102 tests.
+1b. [x] Security review & cleanup (2026-10-08): 9 vulns/bugs fixed, redundant code removed, 104 tests.
 2. [x] Benchmark (2026-10-08) — dima806 failed on unseen fakes (AUC 0.41).
 2b. [x] Compared 8 hosted models (`benchmarks/MODEL_COMPARISON.md`, `--compare`), switched to CommunityForensics: AUC 0.88, acc 80%, 0% false positives; catches 100% text2img / 76% inpainting / 3% face-swap. Threshold left at 0.5 on purpose (tuning on the test set = overfitting; would need a separate validation set).
    - Live API output for this model NOT verified yet (needs working HF_TOKEN). Unit test assumes hosted API returns `[{"label": "LABEL_0", "score": p_fake}]` like the local pipeline.
