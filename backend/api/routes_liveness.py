@@ -35,7 +35,7 @@ async def detect_liveness_image(
 
     validate_image(file)
 
-    async with save_temp_file(file) as temp_path:
+    async with save_temp_file(file, "image") as temp_path:
         start = time.time()
         result = detector.detect_liveness(str(temp_path))
         result["processing_time_ms"] = round((time.time() - start) * 1000, 2)
@@ -72,7 +72,7 @@ async def detect_liveness_video(
     validate_video(file)
     sample_frames = max(1, min(100, sample_frames))  # Clamp to safe range
 
-    async with save_temp_file(file) as temp_path:
+    async with save_temp_file(file, "video") as temp_path:
         start = time.time()
 
         cap = cv2.VideoCapture(str(temp_path))

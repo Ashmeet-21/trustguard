@@ -72,9 +72,3 @@ def test_risk_level_low(detector):
     """Below 0.4 = LOW."""
     assert detector._get_risk_level(0.3) == "LOW"
     assert detector._get_risk_level(0.1) == "LOW"
-
-
-def test_batch_predict_empty(detector):
-    """Batch predict with empty list should return empty list."""
-    results = detector.batch_predict([])
-    assert results == []

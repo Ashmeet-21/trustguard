@@ -51,6 +51,21 @@ class QualityGateChecker:
 
         return gates
 
+    def apply_gates(self, session_result: dict, gates: list) -> dict:
+        """
+        Let failed gates change the decision. Gates can only make it stricter:
+        - replayed file          -> FAIL (someone is re-submitting a captured image)
+        - any other gate failed  -> PASS becomes REVIEW (a human should look at it)
+        """
+        failed = [g["gate"] for g in gates if not g["passed"]]
+        if "replay_protection" in failed:
+            session_result["decision"] = "FAIL"
+            session_result["explanation"].append("Quality gate: this exact file was already used in another session (replay)")
+        elif failed and session_result["decision"] == "PASS":
+            session_result["decision"] = "REVIEW"
+            session_result["explanation"].append(f"Quality gates failed: {', '.join(failed)} — manual review needed")
+        return session_result
+
     def check_replay(self, file_hash: str, session_id: str) -> bool:
         """
         Check if we've seen this exact file before (replay attack prevention).

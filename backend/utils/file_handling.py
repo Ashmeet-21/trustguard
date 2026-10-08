@@ -4,7 +4,6 @@ Handles temporary file uploads with security hardening.
 """
 
 import uuid
-import shutil
 from pathlib import Path
 from contextlib import asynccontextmanager
 from fastapi import UploadFile, HTTPException
@@ -13,20 +12,22 @@ from backend.utils import config
 
 UPLOAD_DIR = Path(__file__).parent.parent / "temp_uploads"
 
-# Magic bytes for file type validation (checked against actual file content, not headers)
-IMAGE_SIGNATURES = {
-    b"\xff\xd8\xff": "image/jpeg",       # JPEG
-    b"\x89PNG\r\n\x1a\n": "image/png",   # PNG
-}
-VIDEO_SIGNATURES = {
-    b"\x00\x00\x00": "video/mp4",        # MP4/MOV (ftyp box)
-}
-AUDIO_SIGNATURES = {
-    b"RIFF": "audio/wav",                 # WAV
-    b"\xff\xfb": "audio/mp3",            # MP3
-    b"\xff\xf3": "audio/mp3",            # MP3
-    b"ID3": "audio/mp3",                 # MP3 with ID3 tag
-}
+def _looks_like(kind: str, header: bytes) -> bool:
+    """
+    Check the file's first bytes ("magic bytes") match the expected kind.
+    The Content-Type header is set by the client and can lie — the file content can't.
+    """
+    is_mp4_family = header[4:8] == b"ftyp"   # MP4 / MOV / M4A all start with an 'ftyp' box
+    if kind == "image":
+        return header.startswith(b"\xff\xd8\xff") or header.startswith(b"\x89PNG\r\n\x1a\n")
+    if kind == "video":
+        return is_mp4_family or header.startswith(b"RIFF")          # RIFF = AVI
+    if kind == "audio":
+        return (header.startswith(b"RIFF")                           # WAV
+                or header.startswith(b"ID3")                         # MP3 with tag
+                or header[:2] in (b"\xff\xfb", b"\xff\xf3", b"\xff\xf2")  # MP3
+                or is_mp4_family)                                    # M4A
+    return False
 
 
 def _sanitize_extension(filename: str) -> str:
@@ -67,25 +68,18 @@ def validate_audio(file: UploadFile):
         )
 
 
-def _check_magic_bytes(file_path: Path, signatures: dict) -> bool:
-    """Validate file's magic bytes match expected type."""
-    try:
-        with open(file_path, "rb") as f:
-            header = f.read(12)
-        return any(header.startswith(sig) for sig in signatures)
-    except Exception:
-        return False
-
-
 @asynccontextmanager
-async def save_temp_file(file: UploadFile):
+async def save_temp_file(file: UploadFile, kind: str):
     """
     Save an uploaded file temporarily, yield its path, then clean up.
+
+    kind: "image", "video" or "audio" — the file content must match it.
 
     Security:
     - Uses UUID filename (prevents path traversal)
     - Enforces MAX_UPLOAD_SIZE during stream
     - Validates resolved path stays within UPLOAD_DIR
+    - Checks magic bytes so a renamed/mislabelled file is rejected
     """
     UPLOAD_DIR.mkdir(exist_ok=True)
     ext = _sanitize_extension(file.filename)
@@ -114,6 +108,12 @@ async def save_temp_file(file: UploadFile):
                         detail=f"File too large. Maximum size: {config.MAX_UPLOAD_SIZE // (1024*1024)}MB"
                     )
                 buffer.write(chunk)
+
+        with temp_path.open("rb") as f:
+            header = f.read(12)
+        if not _looks_like(kind, header):
+            raise HTTPException(status_code=400, detail=f"File content is not a valid {kind}")
+
         yield temp_path
     finally:
         if temp_path.exists():

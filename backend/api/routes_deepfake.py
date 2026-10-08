@@ -34,7 +34,7 @@ async def detect_deepfake_image(
 
     validate_image(file)
 
-    async with save_temp_file(file) as temp_path:
+    async with save_temp_file(file, "image") as temp_path:
         start = time.time()
         result = detector.predict_image(str(temp_path))
         result["processing_time_ms"] = round((time.time() - start) * 1000, 2)
@@ -71,9 +71,12 @@ async def detect_deepfake_video(
     validate_video(file)
     sample_frames = max(1, min(100, sample_frames))  # Clamp to safe range
 
-    async with save_temp_file(file) as temp_path:
+    async with save_temp_file(file, "video") as temp_path:
         start = time.time()
-        result = detector.predict_video(str(temp_path), sample_frames)
+        try:
+            result = detector.predict_video(str(temp_path), sample_frames)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
         result["processing_time_ms"] = round((time.time() - start) * 1000, 2)
 
     log = VerificationLog(
@@ -109,10 +112,13 @@ async def detect_batch(
     results = []
     for file in files:
         try:
-            async with save_temp_file(file) as temp_path:
+            validate_image(file)
+            async with save_temp_file(file, "image") as temp_path:
                 result = detector.predict_image(str(temp_path))
                 result["filename"] = file.filename
                 results.append(result)
+        except HTTPException as e:
+            results.append({"filename": file.filename, "error": e.detail, "is_deepfake": None})
         except Exception as e:
             logger.error("Batch processing failed for {}: {}", file.filename, e)
             results.append({"filename": file.filename, "error": "Processing failed", "is_deepfake": None})

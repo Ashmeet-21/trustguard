@@ -54,7 +54,7 @@ async def verify_kyc(
 
     validate_image(file)
 
-    async with save_temp_file(file) as temp_path:
+    async with save_temp_file(file, "image") as temp_path:
         start = time.time()
 
         # Run both checks on the same image

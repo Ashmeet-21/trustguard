@@ -34,7 +34,7 @@ async def detect_voice(
 
     validate_audio(file)
 
-    async with save_temp_file(file) as temp_path:
+    async with save_temp_file(file, "audio") as temp_path:
         result = detector.detect_voice(str(temp_path))
 
     # Save to database
@@ -72,12 +72,15 @@ async def detect_voice_batch(
     for file in files:
         try:
             validate_audio(file)
-            async with save_temp_file(file) as temp_path:
+            async with save_temp_file(file, "audio") as temp_path:
                 result = detector.detect_voice(str(temp_path))
                 result["filename"] = file.filename
                 results.append(result)
+        except HTTPException as e:
+            results.append({"filename": file.filename, "error": e.detail, "is_synthetic": None})
         except Exception as e:
-            results.append({"filename": file.filename, "error": str(e), "is_synthetic": None})
+            logger.error("Voice batch failed for {}: {}", file.filename, e)
+            results.append({"filename": file.filename, "error": "Processing failed", "is_synthetic": None})
 
     summary = {
         "synthetic_detected": sum(1 for r in results if r.get("is_synthetic") is True),

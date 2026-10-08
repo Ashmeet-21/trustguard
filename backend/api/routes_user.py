@@ -4,7 +4,7 @@ Profile and verification history for authenticated users.
 """
 
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from jose import JWTError, jwt
@@ -20,27 +20,30 @@ router = APIRouter(prefix="/api/v1/user", tags=["User"])
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
 
+def _user_from_token(token: str, db: Session) -> Optional[User]:
+    """Decode + verify a JWT and load its user. Returns None if the token is bad/expired or the user is gone/disabled."""
+    try:
+        payload = jwt.decode(token, config.JWT_SECRET_KEY, algorithms=[config.JWT_ALGORITHM], issuer="trustguard")
+        user_id = int(payload["sub"])
+    except (JWTError, KeyError, ValueError):
+        return None
+
+    user = db.query(User).filter(User.id == user_id).first()
+    return user if user and user.is_active else None
+
+
 def get_current_user(
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
 ) -> User:
-    """Extract and validate the current user from JWT token."""
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Invalid or expired token",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    try:
-        payload = jwt.decode(token, config.JWT_SECRET_KEY, algorithms=[config.JWT_ALGORITHM])
-        user_id = payload.get("sub")
-        if user_id is None:
-            raise credentials_exception
-    except JWTError:
-        raise credentials_exception
-
-    user = db.query(User).filter(User.id == int(user_id)).first()
+    """Extract and validate the current user from JWT token (401 if missing/invalid)."""
+    user = _user_from_token(token, db)
     if user is None:
-        raise credentials_exception
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     return user
 
 
@@ -53,17 +56,7 @@ def get_optional_user(
     db: Session = Depends(get_db),
 ) -> Optional[User]:
     """Like get_current_user but returns None instead of 401 when no token is present."""
-    if not token:
-        return None
-    try:
-        payload = jwt.decode(token, config.JWT_SECRET_KEY, algorithms=[config.JWT_ALGORITHM])
-        user_id = payload.get("sub")
-        if user_id is None:
-            return None
-    except JWTError:
-        return None
-
-    return db.query(User).filter(User.id == int(user_id)).first()
+    return _user_from_token(token, db) if token else None
 
 
 @router.get("/me", response_model=UserResponse)
@@ -76,8 +69,8 @@ async def get_profile(current_user: User = Depends(get_current_user)):
 async def get_verification_history(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
-    skip: int = 0,
-    limit: int = 50,
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=50, ge=1, le=100),
 ):
     """Get the current user's verification history."""
     logs = (

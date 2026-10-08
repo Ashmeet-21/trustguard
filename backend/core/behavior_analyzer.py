@@ -162,19 +162,25 @@ class BehaviorAnalyzer:
             return 0.0
 
         speeds = []
+        zero_time_moves = 0
         for i in range(1, len(movements)):
             dx = movements[i]["x"] - movements[i - 1]["x"]
             dy = movements[i]["y"] - movements[i - 1]["y"]
             dt = movements[i]["timestamp_ms"] - movements[i - 1]["timestamp_ms"]
 
             if dt <= 0:
-                speeds.append(float("inf"))
+                zero_time_moves += 1  # moved in 0ms or back in time — not physically possible
             else:
                 distance = np.sqrt(dx ** 2 + dy ** 2)
                 speeds.append(distance / dt)  # pixels per ms
 
-        avg_speed = np.mean([s for s in speeds if s != float("inf")])
-        speed_variance = np.var([s for s in speeds if s != float("inf")])
+        # Mostly impossible timestamps = scripted input. (Without this check, an all-zero
+        # list made the average NaN, every comparison below False, and the bot scored 0.9.)
+        if not speeds or zero_time_moves > len(speeds):
+            return 0.1
+
+        avg_speed = np.mean(speeds)
+        speed_variance = np.var(speeds)
 
         # Too fast = bot. Natural mouse movement has varying speed.
         if avg_speed > 50:

@@ -3,7 +3,6 @@ TrustGuard - Authentication Routes
 User registration and login with JWT tokens.
 """
 
-import re
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
@@ -34,20 +33,6 @@ def verify_password(plain: str, hashed: str) -> bool:
     return pwd_context.verify(plain, hashed)
 
 
-def validate_password_strength(password: str):
-    """Enforce password complexity: 12+ chars, upper, lower, digit, special."""
-    if len(password) < 12:
-        raise HTTPException(status_code=400, detail="Password must be at least 12 characters")
-    if not re.search(r'[A-Z]', password):
-        raise HTTPException(status_code=400, detail="Password must contain an uppercase letter")
-    if not re.search(r'[a-z]', password):
-        raise HTTPException(status_code=400, detail="Password must contain a lowercase letter")
-    if not re.search(r'[0-9]', password):
-        raise HTTPException(status_code=400, detail="Password must contain a digit")
-    if not re.search(r'[^A-Za-z0-9]', password):
-        raise HTTPException(status_code=400, detail="Password must contain a special character")
-
-
 def create_access_token(user_id: int, email: str) -> str:
     """Create a JWT token with user_id, email, issued-at, and expiry."""
     now = datetime.now(timezone.utc)
@@ -65,9 +50,7 @@ def create_access_token(user_id: int, email: str) -> str:
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 @limiter.limit("5/minute")
 async def register(request: Request, user_in: UserCreate, db: Session = Depends(get_db)):
-    """Register a new user account."""
-    validate_password_strength(user_in.password)
-
+    """Register a new user account. (Email format + password strength are enforced by the UserCreate schema.)"""
     # Check if email already exists — use generic error to prevent enumeration
     existing = db.query(User).filter(User.email == user_in.email).first()
     if existing:
@@ -96,8 +79,8 @@ async def login(
 ):
     """Login and receive a JWT access token."""
     # Find user by email (username field holds email)
-    user = db.query(User).filter(User.email == form_data.username).first()
-    if not user or not verify_password(form_data.password, user.hashed_password):
+    user = db.query(User).filter(User.email == form_data.username.lower().strip()).first()
+    if not user or not verify_password(form_data.password, user.hashed_password) or not user.is_active:
         logger.warning("Failed login attempt from ip={}", request.client.host if request.client else "unknown")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

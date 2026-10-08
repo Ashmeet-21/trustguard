@@ -24,7 +24,7 @@ from backend.utils import config
 from backend.utils.logging import setup_logging
 from backend.core.deepfake_detector import DeepfakeDetector
 from backend.core.liveness_detector import LivenessDetector
-from backend.core.hf_gateway import HFGateway
+from backend.core.hf_gateway import HFGateway, DetectorUnavailable
 from backend.core.voice_detector import VoiceDetector
 from backend.core.behavior_analyzer import BehaviorAnalyzer
 from backend.core.risk_engine import RiskEngine
@@ -70,11 +70,7 @@ async def lifespan(app):
     hf_gateway = HFGateway()
 
     # Initialize deepfake detector — uses HF API when token is set, local model otherwise
-    try:
-        detector = DeepfakeDetector(model_path=config.DEEPFAKE_MODEL_PATH, hf_gateway=hf_gateway)
-    except Exception as e:
-        logger.warning("Could not load deepfake detector: {}. Retrying without model path.", e)
-        detector = DeepfakeDetector(hf_gateway=hf_gateway)
+    detector = DeepfakeDetector(hf_gateway=hf_gateway)
 
     routes_deepfake.detector = detector
     routes_general.deepfake_detector_loaded = True
@@ -223,6 +219,13 @@ app.add_middleware(SecurityHeadersMiddleware)
 # Rate limiting — prevents API abuse (e.g., 10 requests/minute per IP)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
+@app.exception_handler(DetectorUnavailable)
+async def detector_unavailable_handler(request: Request, exc: DetectorUnavailable):
+    """An outside detection service is down — tell the client to retry instead of guessing a result."""
+    logger.error("Detector unavailable on {}: {}", request.url.path, exc)
+    return JSONResponse(status_code=503, content={"detail": str(exc)})
 
 # CORS — explicit method and header whitelist
 app.add_middleware(

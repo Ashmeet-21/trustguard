@@ -57,8 +57,8 @@ class SessionOrchestrator:
         if expired:
             logger.info("Cleaned up {} expired sessions", len(expired))
 
-    def create_session(self) -> str:
-        """Create a new verification session, returns session_id."""
+    def create_session(self, user_id: int = None) -> str:
+        """Create a new verification session, returns session_id. user_id = owner (None = anonymous)."""
         with self._lock:
             self._cleanup_expired()
 
@@ -71,6 +71,7 @@ class SessionOrchestrator:
             self.sessions[session_id] = {
                 "session_id": session_id,
                 "created_at": datetime.utcnow().isoformat(),
+                "user_id": user_id,
                 "status": "created",
                 "agents": {},
                 "result": None,
@@ -95,8 +96,9 @@ class SessionOrchestrator:
             if session_id not in self.sessions:
                 return {"error": "Session not found"}
             session = self.sessions[session_id]
-            if session["status"] == "processing":
-                return {"error": "Session is already being processed"}
+            # One attempt per session — otherwise an attacker could keep retrying until PASS
+            if session["status"] != "created":
+                return {"error": f"Session already {session['status']}"}
             session["status"] = "processing"
 
         start = time.time()
@@ -133,6 +135,8 @@ class SessionOrchestrator:
         if audio_path and self.voice_detector:
             try:
                 voice_result = self.voice_detector.detect_voice(audio_path)
+                if voice_result.get("model_used") == "error":  # detector couldn't analyze the audio
+                    raise ValueError("voice analysis failed")
                 voice_score = round(voice_result["human_score"] * 100, 1)
                 signals["voice_agent"] = {
                     "score": voice_score,
@@ -161,6 +165,12 @@ class SessionOrchestrator:
         clean_signals = {k: v for k, v in signals.items() if "error" not in v}
         risk_result = self.risk_engine.calculate(clean_signals)
         processing_time = round((time.time() - start) * 1000, 2)
+
+        # Fail closed: if a check we were asked to run crashed, never auto-PASS
+        failed_agents = [k for k, v in signals.items() if "error" in v]
+        if failed_agents and risk_result["decision"] == "PASS":
+            risk_result["decision"] = "REVIEW"
+            risk_result["explanation"].append(f"Could not run: {', '.join(failed_agents)} — manual review needed")
 
         session_result = {
             "session_id": session_id,

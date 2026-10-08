@@ -15,6 +15,9 @@ from loguru import logger
 from typing import Dict, Union
 import cv2
 
+from backend.core.hf_gateway import DetectorUnavailable
+from backend.utils import config
+
 
 class DeepfakeDetector:
     """
@@ -26,7 +29,7 @@ class DeepfakeDetector:
 
     MODEL_NAME = "dima806/deepfake_vs_real_image_detection"
 
-    def __init__(self, model_path: str = None, device: str = None, hf_gateway=None):
+    def __init__(self, device: str = None, hf_gateway=None):
         self._hf_gateway = hf_gateway
         self._model = None
         self._processor = None
@@ -38,9 +41,9 @@ class DeepfakeDetector:
             logger.info("DeepfakeDetector: using HF Inference API mode")
         else:
             self._mode = "local"
-            self._load_local_model(model_path, device)
+            self._load_local_model(device)
 
-    def _load_local_model(self, model_path, device):
+    def _load_local_model(self, device):
         """Load ViT model locally using torch (dev fallback)."""
         import torch
         from transformers import ViTImageProcessor, ViTForImageClassification
@@ -93,16 +96,9 @@ class DeepfakeDetector:
             if tmp_path and os.path.exists(tmp_path):
                 os.unlink(tmp_path)
 
-        # Error fallback — default to uncertain REAL to avoid false positives
+        # Fail closed: if the API is down we must NOT guess "REAL" — that would let fakes through
         if not results or results[0].get("label") == "error":
-            logger.warning("HF API returned error, defaulting to REAL/uncertain")
-            return {
-                "is_deepfake": False,
-                "confidence": 0.5,
-                "probabilities": {"real": 0.5, "fake": 0.5},
-                "classification": "REAL",
-                "risk_level": "MEDIUM",
-            }
+            raise DetectorUnavailable("Deepfake detection service unavailable")
 
         fake_prob = 0.0
         real_prob = 0.0
@@ -119,19 +115,7 @@ class DeepfakeDetector:
             fake_prob /= total
             real_prob /= total
 
-        is_deepfake = fake_prob > 0.5
-        confidence = fake_prob if is_deepfake else real_prob
-
-        return {
-            "is_deepfake": bool(is_deepfake),
-            "confidence": float(round(confidence, 4)),
-            "probabilities": {
-                "real": float(round(real_prob, 4)),
-                "fake": float(round(fake_prob, 4)),
-            },
-            "classification": "FAKE" if is_deepfake else "REAL",
-            "risk_level": self._get_risk_level(fake_prob),
-        }
+        return self._build_result(fake_prob, real_prob)
 
     def _predict_local(self, image_input: Union[str, Image.Image, np.ndarray]) -> Dict:
         """Local torch inference (dev only)."""
@@ -154,10 +138,11 @@ class DeepfakeDetector:
 
         fake_idx = next(i for i, lbl in self._labels.items() if lbl.lower() == "fake")
         real_idx = next(i for i, lbl in self._labels.items() if lbl.lower() == "real")
-        fake_prob = probs[fake_idx].item()
-        real_prob = probs[real_idx].item()
+        return self._build_result(probs[fake_idx].item(), probs[real_idx].item())
 
-        is_deepfake = fake_prob > 0.5
+    def _build_result(self, fake_prob: float, real_prob: float) -> Dict:
+        """Turn model probabilities into the standard result dict (shared by API and local mode)."""
+        is_deepfake = fake_prob > config.DEEPFAKE_THRESHOLD
         confidence = fake_prob if is_deepfake else real_prob
 
         return {
@@ -178,7 +163,10 @@ class DeepfakeDetector:
             raise ValueError(f"Could not open video: {video_path}")
 
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        frame_indices = np.linspace(0, total_frames - 1, sample_frames, dtype=int)
+        if total_frames <= 0:
+            cap.release()
+            raise ValueError("Video has no readable frames")
+        frame_indices = np.linspace(0, total_frames - 1, min(sample_frames, total_frames), dtype=int)
 
         predictions = []
         for frame_idx in frame_indices:
@@ -190,6 +178,8 @@ class DeepfakeDetector:
             predictions.append(result)
 
         cap.release()
+        if not predictions:
+            raise ValueError("Could not decode any frames from video")
 
         fake_count = sum(1 for p in predictions if p["is_deepfake"])
         avg_fake_prob = np.mean([p["probabilities"]["fake"] for p in predictions])
@@ -215,14 +205,3 @@ class DeepfakeDetector:
             return "MEDIUM"
         else:
             return "LOW"
-
-    def batch_predict(self, image_paths: list) -> list:
-        results = []
-        for path in image_paths:
-            try:
-                result = self.predict_image(path)
-                result["image_path"] = path
-                results.append(result)
-            except Exception as e:
-                results.append({"image_path": path, "error": str(e), "is_deepfake": None})
-        return results

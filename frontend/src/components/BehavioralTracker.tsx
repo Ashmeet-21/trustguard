@@ -88,9 +88,10 @@ export default function BehavioralTracker({ onComplete, onReset }: Props) {
     if (val.length >= targetPhrase.length) {
       if (acc >= MIN_ACCURACY) {
         setCompleted(true);
+        // Backend caps these at 2000 / 5000 points — send the most recent ones
         onComplete({
-          keystrokes: keystrokesRef.current,
-          mouse_movements: mouseRef.current,
+          keystrokes: keystrokesRef.current.slice(-2000),
+          mouse_movements: mouseRef.current.slice(-5000),
         });
       } else {
         setMismatchError(true);

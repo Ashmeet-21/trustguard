@@ -15,7 +15,7 @@ final verdict. This is essential for compliance in fintech/KYC."
 """
 
 import json
-import os
+import uuid
 from collections import OrderedDict
 from datetime import datetime
 from pathlib import Path
@@ -38,7 +38,7 @@ class AuditReporter:
         self._reports = OrderedDict()  # Bounded LRU cache
         logger.info("Audit reporter initialized (dir={})", AUDIT_DIR)
 
-    def generate_report(self, session_id: str, session_result: dict, metadata: dict = None) -> dict:
+    def generate_report(self, session_id: str, session_result: dict, metadata: dict = None, user_id: int = None) -> dict:
         """
         Create a full audit report for a verification session.
 
@@ -46,6 +46,7 @@ class AuditReporter:
             session_id: The session's unique ID
             session_result: The result from SessionOrchestrator.run_session()
             metadata: Optional extra info (IP address, user agent, etc.)
+            user_id: Owner of the session (None = anonymous). Only the owner can read the report.
 
         Returns:
             Complete audit report dict
@@ -54,6 +55,7 @@ class AuditReporter:
             "report_id": session_id,
             "timestamp": datetime.utcnow().isoformat(),
             "session_id": session_id,
+            "user_id": user_id,
             "decision": session_result.get("decision", "UNKNOWN"),
             "trust_score": session_result.get("trust_score", 0),
             "overall_risk": session_result.get("overall_risk", "UNKNOWN"),
@@ -92,20 +94,23 @@ class AuditReporter:
             logger.error("Failed to save audit report file: {}", e)
 
         # Save to database
+        db = SessionLocal()
         try:
-            db = SessionLocal()
-            log = AuditLog(
-                action="verification_completed",
-                details=report,
-            )
-            db.add(log)
+            db.add(AuditLog(action="verification_completed", user_id=report.get("user_id"), details=report))
             db.commit()
-            db.close()
         except Exception as e:
             logger.error("Failed to save audit report to DB: {}", e)
+        finally:
+            db.close()
 
     def get_report(self, session_id: str) -> dict:
         """Retrieve an audit report by session ID."""
+        # session_id is used in a file path — only accept real UUIDs (blocks ..\ path traversal)
+        try:
+            session_id = str(uuid.UUID(session_id))
+        except ValueError:
+            return None
+
         # Check in-memory cache first
         if session_id in self._reports:
             return self._reports[session_id]
@@ -125,18 +130,17 @@ class AuditReporter:
 
         return None
 
-    def get_recent_reports(self, limit: int = 10) -> list:
-        """Get recent audit reports from database."""
+    def get_recent_reports(self, user_id: int, limit: int = 10) -> list:
+        """Get the given user's recent audit reports from database."""
+        db = SessionLocal()
         try:
-            db = SessionLocal()
             logs = (
                 db.query(AuditLog)
-                .filter(AuditLog.action == "verification_completed")
+                .filter(AuditLog.action == "verification_completed", AuditLog.user_id == user_id)
                 .order_by(AuditLog.created_at.desc())
                 .limit(limit)
                 .all()
             )
-            db.close()
 
             return [
                 {
@@ -151,3 +155,5 @@ class AuditReporter:
         except Exception as e:
             logger.error("Failed to get recent audit reports: {}", e)
             return []
+        finally:
+            db.close()
