@@ -66,28 +66,38 @@ def download_sample(n_real: int, seed: int = 42) -> dict:
 
 # ── Step 2: run the detectors ───────────────────────────────
 
-def run(samples: dict) -> dict:
+def make_deepfake_scorer(model_id: str):
+    """Return a function: image path -> probability the image is fake (0..1).
+    Uses TrustGuard's own DeepfakeDetector, so the benchmark tests the real production code.
+    model_id=None -> the model configured in backend/utils/config.py (what the live site uses)."""
     from backend.core.deepfake_detector import DeepfakeDetector
+    detector = DeepfakeDetector(model_name=model_id)
+    return lambda path: detector.predict_image(path)["probabilities"]["fake"]
+
+
+def run(samples: dict, model_id: str = None, with_liveness: bool = True) -> dict:
     from backend.core.liveness_detector import LivenessDetector
 
-    deepfake = DeepfakeDetector()  # local model = same model the live API uses
-    liveness = LivenessDetector()
+    fake_score = make_deepfake_scorer(model_id)
+    liveness = LivenessDetector() if with_liveness else None
 
     rows = []
     for source, paths in samples.items():
         is_fake = source != "wiki"
         for path in paths:
-            df = deepfake.predict_image(str(path))
-            lv = liveness.detect_liveness(str(path))
-            rows.append({
+            p_fake = fake_score(str(path))
+            row = {
                 "file": f"{source}/{path.name}",
                 "source": source,
                 "label": "FAKE" if is_fake else "REAL",
-                "fake_prob": df["probabilities"]["fake"],
-                "predicted": "FAKE" if df["is_deepfake"] else "REAL",
-                "liveness_score": lv["liveness_score"],
-                "face_detected": lv["checks"]["face_detected"],
-            })
+                "fake_prob": round(p_fake, 4),
+                "predicted": "FAKE" if p_fake > 0.5 else "REAL",
+            }
+            if liveness:
+                lv = liveness.detect_liveness(str(path))
+                row["liveness_score"] = lv["liveness_score"]
+                row["face_detected"] = lv["checks"]["face_detected"]
+            rows.append(row)
         print(f"  {source}: {len(paths)} images done")
     return rows
 
@@ -127,27 +137,55 @@ def summarize(rows: list) -> dict:
                 for src in FAKE_SOURCES
             },
         },
-        "liveness_on_real_photos": {
-            # These are genuine photos, not live selfies or print/screen attacks, so this is
-            # only a rough "does liveness reject normal faces?" check — not a spoof benchmark.
+    }
+    if real and "liveness_score" in real[0]:
+        # These are genuine photos, not live selfies or print/screen attacks, so this is
+        # only a rough "does liveness reject normal faces?" check — not a spoof benchmark.
+        summary["liveness_on_real_photos"] = {
             "face_detected_pct": pct(sum(r["face_detected"] for r in real), len(real)),
             "scored_live_pct": pct(sum(r["liveness_score"] >= 0.7 for r in real), len(real)),
-            "avg_score": round(sum(r["liveness_score"] for r in real) / len(real), 3) if real else 0,
-        },
-    }
+            "avg_score": round(sum(r["liveness_score"] for r in real) / len(real), 3),
+        }
     return summary
+
+
+def compare_models(samples: dict, model_ids: list):
+    """Run several deepfake models on the same images and write a comparison table."""
+    results = []
+    for model_id in model_ids:
+        print(f"\n=== {model_id}")
+        d = summarize(run(samples, model_id, with_liveness=False))["deepfake"]
+        results.append((model_id, d))
+
+    results.sort(key=lambda x: x[1]["auc"], reverse=True)
+    lines = [
+        "| Model | AUC | Accuracy | Fakes caught | Real wrongly flagged | text2img | inpainting | insight |",
+        "|---|---|---|---|---|---|---|---|",
+    ]
+    for name, d in results:
+        g = d["by_generator"]
+        lines.append(f"| `{name}` | **{d['auc']}** | {d['accuracy']}% | {d['fakes_caught_pct']}% | "
+                     f"{d['real_wrongly_flagged_pct']}% | {g['text2img']}% | {g['inpainting']}% | {g['insight']}% |")
+    table = "\n".join(lines)
+    (Path(__file__).parent / "MODEL_COMPARISON.md").write_text(
+        "# Deepfake model comparison\n\nSame images as RESULTS.md (DeepFakeFace, seed 42), threshold 0.5. "
+        "Sorted by AUC (0.5 = guessing, 1.0 = perfect).\n"
+        "Reproduce: `python -m benchmarks.run_benchmark --compare`\n\n" + table + "\n", encoding="utf-8")
+    print("\n" + table)
 
 
 def write_report(summary: dict, rows: list, seconds: float):
     out = Path(__file__).parent
     (out / "results.json").write_text(json.dumps({"summary": summary, "rows": rows}, indent=2))
 
-    d, lv = summary["deepfake"], summary["liveness_on_real_photos"]
+    d, lv = summary["deepfake"], summary.get("liveness_on_real_photos", {})
     gen = "\n".join(f"| {src} | {p}% |" for src, p in d["by_generator"].items())
+    from backend.utils import config
     md = f"""# Benchmark Results
 
-Dataset: [OpenRL/DeepFakeFace](https://huggingface.co/datasets/OpenRL/DeepFakeFace) — {summary['real']} real + {summary['fake']} fake face images,
+Model: `{config.HF_IMAGE_MODEL}` · Dataset: [OpenRL/DeepFakeFace](https://huggingface.co/datasets/OpenRL/DeepFakeFace) — {summary['real']} real + {summary['fake']} fake face images,
 random sample (seed 42). The deepfake model was **not** trained on this dataset.
+How this model was chosen: [MODEL_COMPARISON.md](MODEL_COMPARISON.md).
 Reproduce: `python -m benchmarks.run_benchmark` (took {seconds:.0f}s on CPU).
 
 ## Deepfake detector
@@ -179,9 +217,22 @@ rejects normal faces. A real spoof benchmark needs a presentation-attack dataset
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--n", type=int, default=100, help="number of real images (fakes ≈ same)")
+    parser.add_argument("--compare", action="store_true", help="compare candidate deepfake models")
     args = parser.parse_args()
 
     start = time.time()
     samples = download_sample(args.n)
-    rows = run(samples)
-    write_report(summarize(rows), rows, time.time() - start)
+    if args.compare:
+        compare_models(samples, [
+            "dima806/deepfake_vs_real_image_detection",  # original model
+            "buildborderless/CommunityForensics-DeepfakeDet-ViT",  # current (chosen by this comparison)
+            "haywoodsloan/ai-image-detector-deploy",
+            "Smogy/SMOGY-Ai-images-detector",
+            "umm-maybe/AI-image-detector",
+            "Ateeqq/ai-vs-human-image-detector",
+            "prithivMLmods/AI-vs-Deepfake-vs-Real-Siglip2",
+            "prithivMLmods/Deep-Fake-Detector-v2-Model",
+        ])
+    else:
+        rows = run(samples)
+        write_report(summarize(rows), rows, time.time() - start)

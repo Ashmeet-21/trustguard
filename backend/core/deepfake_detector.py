@@ -2,9 +2,11 @@
 Deepfake Detector Module
 
 API mode (HF_TOKEN set):   calls HF Inference API — no torch needed, works on 512MB RAM
-Local mode (no HF_TOKEN):  loads ViT model with torch (dev/local only)
+Local mode (no HF_TOKEN):  runs the same model locally with transformers (dev/local only)
 
-Model: dima806/deepfake_vs_real_image_detection
+Model: config.HF_IMAGE_MODEL — default buildborderless/CommunityForensics-DeepfakeDet-ViT.
+Chosen by benchmarks/run_benchmark.py --compare: best of 8 models on fakes it had never seen
+(AUC 0.88, 0% real photos wrongly flagged). See benchmarks/MODEL_COMPARISON.md.
 """
 
 import tempfile
@@ -18,80 +20,62 @@ import cv2
 from backend.core.hf_gateway import DetectorUnavailable
 from backend.utils import config
 
+# Models name their classes differently — any of these labels means "not a real photo".
+# (CommunityForensics has a single output, LABEL_0 = probability the image is fake.)
+FAKE_LABELS = {"fake", "deepfake", "ai", "artificial", "label_0"}
+
 
 class DeepfakeDetector:
     """
     Deepfake Detection using a pretrained Vision Transformer (ViT).
 
     In production (HF_TOKEN set), inference goes through the HF Inference API.
-    Locally, it loads the model with torch for offline use.
+    Locally, it runs the model with transformers for offline use.
     """
 
-    MODEL_NAME = "dima806/deepfake_vs_real_image_detection"
-
-    def __init__(self, device: str = None, hf_gateway=None):
+    def __init__(self, device: str = None, hf_gateway=None, model_name: str = None):
+        self.model_name = model_name or config.HF_IMAGE_MODEL
         self._hf_gateway = hf_gateway
-        self._model = None
-        self._processor = None
-        self._device = None
-        self._labels = None
+        self._pipeline = None
 
         if hf_gateway and hf_gateway.client:
             self._mode = "api"
-            logger.info("DeepfakeDetector: using HF Inference API mode")
+            logger.info("DeepfakeDetector: HF Inference API mode (model={})", self.model_name)
         else:
             self._mode = "local"
             self._load_local_model(device)
 
     def _load_local_model(self, device):
-        """Load ViT model locally using torch (dev fallback)."""
-        import torch
-        from transformers import ViTImageProcessor, ViTForImageClassification
+        """Load the model locally (dev fallback). The pipeline handles preprocessing + softmax/sigmoid."""
+        from transformers import pipeline
 
-        if device is None:
-            if torch.cuda.is_available():
-                self._device = torch.device("cuda")
-            elif torch.backends.mps.is_available():
-                self._device = torch.device("mps")
-            else:
-                self._device = torch.device("cpu")
-        else:
-            self._device = torch.device(device)
-
-        logger.info("Using device: {}", self._device)
-        logger.info("Loading deepfake detection model: {}", self.MODEL_NAME)
-        self._processor = ViTImageProcessor.from_pretrained(self.MODEL_NAME)
-        self._model = ViTForImageClassification.from_pretrained(self.MODEL_NAME)
-        self._model.to(self._device)
-        self._model.eval()
-        self._labels = self._model.config.id2label
-        logger.info("Model loaded successfully (labels: {})", self._labels)
+        logger.info("Loading deepfake detection model locally: {}", self.model_name)
+        self._pipeline = pipeline("image-classification", model=self.model_name, top_k=None,
+                                  device=device or "cpu")
+        logger.info("Model loaded (labels: {})", self._pipeline.model.config.id2label)
 
     def predict_image(self, image_input: Union[str, Image.Image, np.ndarray]) -> Dict:
-        """Predict if an image is a deepfake. Accepts path, PIL Image, or numpy array."""
+        """Predict if an image is a deepfake. Accepts path, PIL Image, or numpy array (BGR)."""
         if self._mode == "api":
-            return self._predict_api(image_input)
-        return self._predict_local(image_input)
+            results = self._classify_api(image_input)
+        else:
+            results = self._pipeline(self._to_pil(image_input))
+        return self._build_result(self._fake_probability(results))
 
-    def _predict_api(self, image_input: Union[str, Image.Image, np.ndarray]) -> Dict:
-        """Call HF Inference API for classification."""
+    def _classify_api(self, image_input) -> list:
+        """Send the image to the HF Inference API. Raises DetectorUnavailable if it fails."""
         tmp_path = None
         try:
             if isinstance(image_input, str):
                 image_path = image_input
             else:
-                # Convert numpy/PIL to temp file for API upload
-                if isinstance(image_input, np.ndarray):
-                    pil_image = Image.fromarray(cv2.cvtColor(image_input, cv2.COLOR_BGR2RGB))
-                else:
-                    pil_image = image_input.convert("RGB")
+                # The API needs a file — save numpy/PIL input to a temp JPEG
                 tmp = tempfile.NamedTemporaryFile(suffix=".jpg", delete=False)
-                pil_image.save(tmp.name)
+                self._to_pil(image_input).save(tmp.name)
                 tmp.close()
-                tmp_path = tmp.name
-                image_path = tmp_path
+                tmp_path = image_path = tmp.name
 
-            results = self._hf_gateway.classify_image(image_path, model=self.MODEL_NAME)
+            results = self._hf_gateway.classify_image(image_path, model=self.model_name)
         finally:
             if tmp_path and os.path.exists(tmp_path):
                 os.unlink(tmp_path)
@@ -99,49 +83,26 @@ class DeepfakeDetector:
         # Fail closed: if the API is down we must NOT guess "REAL" — that would let fakes through
         if not results or results[0].get("label") == "error":
             raise DetectorUnavailable("Deepfake detection service unavailable")
+        return results
 
-        fake_prob = 0.0
-        real_prob = 0.0
-        for r in results:
-            label = r["label"].lower()
-            if label == "fake":
-                fake_prob = float(r["score"])
-            elif label == "real":
-                real_prob = float(r["score"])
-
-        # Normalize to sum to 1.0
-        total = fake_prob + real_prob
-        if total > 0:
-            fake_prob /= total
-            real_prob /= total
-
-        return self._build_result(fake_prob, real_prob)
-
-    def _predict_local(self, image_input: Union[str, Image.Image, np.ndarray]) -> Dict:
-        """Local torch inference (dev only)."""
-        import torch
-
+    @staticmethod
+    def _to_pil(image_input) -> Image.Image:
         if isinstance(image_input, str):
-            image = Image.open(image_input).convert("RGB")
-        elif isinstance(image_input, np.ndarray):
-            image = Image.fromarray(cv2.cvtColor(image_input, cv2.COLOR_BGR2RGB))
-        elif isinstance(image_input, Image.Image):
-            image = image_input.convert("RGB")
-        else:
-            raise ValueError("Invalid image input type")
+            return Image.open(image_input).convert("RGB")
+        if isinstance(image_input, np.ndarray):  # OpenCV frames are BGR
+            return Image.fromarray(cv2.cvtColor(image_input, cv2.COLOR_BGR2RGB))
+        if isinstance(image_input, Image.Image):
+            return image_input.convert("RGB")
+        raise ValueError("Invalid image input type")
 
-        inputs = self._processor(images=image, return_tensors="pt").to(self._device)
+    @staticmethod
+    def _fake_probability(results: list) -> float:
+        """[{"label": "LABEL_0", "score": 0.93}, ...] -> 0.93 (sum of all 'fake' class scores)."""
+        return min(1.0, sum(float(r["score"]) for r in results if r["label"].lower() in FAKE_LABELS))
 
-        with torch.no_grad():
-            outputs = self._model(**inputs)
-            probs = torch.nn.functional.softmax(outputs.logits, dim=1)[0]
-
-        fake_idx = next(i for i, lbl in self._labels.items() if lbl.lower() == "fake")
-        real_idx = next(i for i, lbl in self._labels.items() if lbl.lower() == "real")
-        return self._build_result(probs[fake_idx].item(), probs[real_idx].item())
-
-    def _build_result(self, fake_prob: float, real_prob: float) -> Dict:
-        """Turn model probabilities into the standard result dict (shared by API and local mode)."""
+    def _build_result(self, fake_prob: float) -> Dict:
+        """Turn the fake probability into the standard result dict."""
+        real_prob = 1.0 - fake_prob
         is_deepfake = fake_prob > config.DEEPFAKE_THRESHOLD
         confidence = fake_prob if is_deepfake else real_prob
 

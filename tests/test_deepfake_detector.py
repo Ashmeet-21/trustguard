@@ -16,8 +16,8 @@ def test_detector_initializes(detector):
     """Detector should initialize successfully on CPU."""
     assert detector is not None
     assert detector._mode == "local"
-    assert detector._device.type == "cpu"
-    assert detector._model is not None
+    assert detector._pipeline is not None
+    assert detector._pipeline.device.type == "cpu"
 
 
 def test_predict_from_pil_image(detector):

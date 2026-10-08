@@ -27,7 +27,7 @@ docker-compose up --build                       # both services
 ## Backend layout (`backend/`)
 - `main.py` — creates singletons: HFGateway, DeepfakeDetector, LivenessDetector, VoiceDetector, BehaviorAnalyzer, RiskEngine, SessionOrchestrator, AuditReporter; registers 11 routers.
 - `core/`
-  - `deepfake_detector.py` — model `dima806/deepfake_vs_real_image_detection` (ViT). Two modes: `api` (HF_TOKEN set → HF Inference API) or `local` (torch). Attrs are private: `_mode`, `_device`, `_model`. Methods: `predict_image`, `predict_video` (frame sampling + majority vote). Fake if p(fake) > `DEEPFAKE_THRESHOLD`. **Fails closed**: API error → raises `DetectorUnavailable` (→ HTTP 503 via handler in main.py).
+  - `deepfake_detector.py` — model = `config.HF_IMAGE_MODEL`, default **`buildborderless/CommunityForensics-DeepfakeDet-ViT`** (switched 2026-10-08 from dima806 after benchmark; single output `LABEL_0` = p(fake)). Two modes: `api` (HF_TOKEN set → HF Inference API) or `local` (transformers `pipeline`, attrs `_mode`, `_pipeline`). Both feed `_fake_probability()` (sums labels in `FAKE_LABELS`). `DeepfakeDetector(model_name=...)` lets the benchmark test any model. Fake if p(fake) > `DEEPFAKE_THRESHOLD`. **Fails closed**: API error → `DetectorUnavailable` (→ HTTP 503).
   - `liveness_detector.py` — 6 OpenCV/MediaPipe checks (face mesh, LBP texture, FFT frequency, YCrCb color, Canny edges, Laplacian sharpness) → weighted score. `is_live = score >= 0.7`. Risk: ≥0.7 LOW, ≥0.5 MEDIUM, ≥0.3 HIGH, else CRITICAL.
   - `voice_detector.py` — HF API (`MattyB95/AST-ASVspoof2019-Synthetic-Voice-Detection`) primary; scipy spectral fallback (flatness, zero-crossing, energy variation).
   - `behavior_analyzer.py` — rule-based: typing speed/rhythm, mouse speed/straightness. Human if score ≥ 0.6.
@@ -87,7 +87,9 @@ docker-compose up --build                       # both services
 ## Polish plan (started 2026-10-08)
 1. [x] Fix stale tests + CI branch fix (commit 42f2383). CI then caught missing `scipy` in requirements.txt.
 1b. [x] Security review & cleanup (2026-10-08): 9 vulns/bugs fixed, redundant code removed, 102 tests.
-2. [x] Benchmark (2026-10-08) — model fails on unseen fakes (see Honest gaps). Next option: swap in a more robust deepfake model and re-run the same benchmark to compare.
+2. [x] Benchmark (2026-10-08) — dima806 failed on unseen fakes (AUC 0.41).
+2b. [x] Compared 8 hosted models (`benchmarks/MODEL_COMPARISON.md`, `--compare`), switched to CommunityForensics: AUC 0.88, acc 80%, 0% false positives; catches 100% text2img / 76% inpainting / 3% face-swap. Threshold left at 0.5 on purpose (tuning on the test set = overfitting; would need a separate validation set).
+   - Live API output for this model NOT verified yet (needs working HF_TOKEN). Unit test assumes hosted API returns `[{"label": "LABEL_0", "score": p_fake}]` like the local pipeline.
 3. [ ] Live demo (Render + Netlify), add URL to README + GitHub website field, add repo topics.
 4. [ ] README rewrite: demo link + GIF at top, results table, "Limitations & next steps", drop "99%" as own claim.
 5. [ ] Cleanups: CORS lock, root `test_setup.py`.

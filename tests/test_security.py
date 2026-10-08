@@ -123,6 +123,22 @@ def test_deepfake_api_outage_raises_instead_of_guessing_real():
         detector.predict_image(Image.new("RGB", (32, 32)))
 
 
+def test_api_mode_reads_single_output_model():
+    """CommunityForensics returns one label (LABEL_0 = fake probability) — API mode must read it right."""
+    class FakeGateway:
+        client = object()
+        def __init__(self, score):
+            self.score = score
+        def classify_image(self, path, model):
+            return [{"label": "LABEL_0", "score": self.score}]
+
+    image = Image.new("RGB", (32, 32))
+    fake = DeepfakeDetector(hf_gateway=FakeGateway(0.93)).predict_image(image)
+    real = DeepfakeDetector(hf_gateway=FakeGateway(0.02)).predict_image(image)
+    assert fake["is_deepfake"] and fake["probabilities"]["fake"] == 0.93
+    assert not real["is_deepfake"] and real["risk_level"] == "LOW"
+
+
 def test_crashed_agent_blocks_auto_pass(tmp_path):
     """Everything else looks perfect, but the deepfake check crashed -> REVIEW, never PASS."""
     orch = _orchestrator(deepfake=BrokenDeepfakeDetector())
