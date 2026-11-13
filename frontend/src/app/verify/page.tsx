@@ -195,7 +195,7 @@ export default function VerifyPage() {
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-10 md:py-14">
-      <h1 className="text-[2rem] md:text-[2.5rem] font-bold leading-tight tracking-[-0.02em] text-ink">
+      <h1 className="page-title">
         Verify your identity
       </h1>
       <p className="mt-2 text-ink-soft">Three short steps. Your camera and microphone are only used while a step is open.</p>

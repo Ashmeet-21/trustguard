@@ -69,7 +69,7 @@ export default function LoginPage() {
   return (
     <div className="max-w-6xl mx-auto px-6 py-14 md:py-20 grid md:grid-cols-[1fr_26rem] gap-12 md:gap-20">
       <div className="max-w-md md:pt-4">
-        <h1 className="text-[2rem] md:text-[2.5rem] font-bold leading-tight tracking-[-0.02em] text-ink">
+        <h1 className="page-title">
           {isLogin ? "Sign in to run a verification" : "Create an account"}
         </h1>
         <p className="mt-4 text-ink-soft">

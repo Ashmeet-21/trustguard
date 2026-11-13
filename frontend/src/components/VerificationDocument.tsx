@@ -154,8 +154,8 @@ export default function VerificationDocument(props: Props) {
 
         {/* Decision — set like an ink stamp */}
         <div
-          className="col-span-2 sm:col-span-1 justify-self-start sm:justify-self-end self-center px-4 py-2 border-2 rounded-[3px] text-center -rotate-2"
-          style={{ color: style.color, borderColor: style.color, boxShadow: `inset 0 0 0 2px var(--color-sheet), inset 0 0 0 3px ${style.color}` }}
+          className="stamp col-span-2 sm:col-span-1 justify-self-start sm:justify-self-end self-center px-4 py-2 rounded-[3px] text-center -rotate-2"
+          style={{ "--stamp": style.color } as React.CSSProperties}
         >
           <p className="text-2xl font-bold leading-none tracking-wide">{style.word}</p>
           <p className="text-xs mt-1 font-medium">{style.meaning}</p>

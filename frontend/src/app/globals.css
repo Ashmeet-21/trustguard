@@ -23,6 +23,8 @@
   --color-fail-tint: #f6e1e5;
   --color-guilloche: #8fa9a3;
 
+  --text-small: 0.9375rem;      /* body-small: tables, nav, card text */
+
   --font-sans: var(--font-schibsted);
   --font-mono: var(--font-plex-mono);
 }
@@ -48,6 +50,31 @@ body {
     line-height: 1.15;
     text-wrap: balance;
   }
+}
+
+.page-title {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  color: var(--color-ink);
+}
+.section-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--color-ink);
+}
+@media (min-width: 48rem) {
+  .page-title { font-size: 2.5rem; }
+  .section-title { font-size: 2rem; }
+}
+
+/* Decision stamp: colour comes from the --stamp variable set on the element */
+.stamp {
+  color: var(--stamp);
+  border: 2px solid var(--stamp);
+  box-shadow: inset 0 0 0 2px var(--color-sheet), inset 0 0 0 3px var(--stamp);
 }
 
 ::selection {

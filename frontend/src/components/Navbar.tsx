@@ -32,7 +32,7 @@ export default function Navbar() {
           <span className="text-ink">TrustGuard</span>
         </Link>
 
-        <div className="flex items-center gap-1 sm:gap-2 text-[0.9375rem]">
+        <div className="flex items-center gap-1 sm:gap-2 text-small">
           {LINKS.map((link) => {
             const active = pathname === link.href;
             return (

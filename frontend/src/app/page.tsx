@@ -108,7 +108,7 @@ export default function Home() {
       {/* Checks */}
       <section className="border-t border-rule bg-sheet">
         <div className="max-w-6xl mx-auto px-6 py-16 md:py-20">
-          <h2 className="text-[1.75rem] md:text-[2rem] font-bold tracking-[-0.01em] text-ink max-w-2xl">
+          <h2 className="section-title max-w-2xl">
             Four checks, each looking for a different attack
           </h2>
           <p className="mt-3 text-ink-soft max-w-2xl">
@@ -124,8 +124,8 @@ export default function Home() {
                   <h3 className="font-semibold text-ink">{c.name}</h3>
                   <span className="font-semibold figures">{c.weight}%</span>
                 </div>
-                <p className="mt-1 text-ink-soft text-[0.9375rem]">{c.how}</p>
-                <dl className="mt-3 grid grid-cols-[6.5rem_1fr] gap-x-3 gap-y-1 text-[0.9375rem]">
+                <p className="mt-1 text-ink-soft text-small">{c.how}</p>
+                <dl className="mt-3 grid grid-cols-[6.5rem_1fr] gap-x-3 gap-y-1 text-small">
                   <dt className="text-ink-faint">Catches</dt>
                   <dd className="text-ink">{c.catches}</dd>
                   <dt className="text-ink-faint">Doesn’t catch</dt>
@@ -136,7 +136,7 @@ export default function Home() {
           </ul>
 
           <div className="mt-10 hidden md:block">
-            <table className="w-full text-left text-[0.9375rem]">
+            <table className="w-full text-left text-small">
               <thead>
                 <tr className="border-b-2 border-ink text-ink">
                   <th scope="col" className="py-3 pr-6 font-semibold w-[22%]">Check</th>
@@ -166,7 +166,7 @@ export default function Home() {
       <section className="border-t border-rule">
         <div className="max-w-6xl mx-auto px-6 py-16 md:py-20 grid md:grid-cols-[18rem_1fr] gap-10 md:gap-16">
           <div>
-            <h2 className="text-[1.75rem] md:text-[2rem] font-bold tracking-[-0.01em] text-ink">
+            <h2 className="section-title">
               How a decision is made
             </h2>
             <p className="mt-3 text-ink-soft">
@@ -195,7 +195,7 @@ export default function Home() {
       <section id="accuracy" className="border-t border-rule bg-sheet scroll-mt-4">
         <div className="max-w-6xl mx-auto px-6 py-16 md:py-20 grid lg:grid-cols-2 gap-10 lg:gap-16">
           <div>
-            <h2 className="text-[1.75rem] md:text-[2rem] font-bold tracking-[-0.01em] text-ink">
+            <h2 className="section-title">
               Measured, not claimed
             </h2>
             <div className="mt-4 space-y-4 text-ink-soft max-w-[60ch]">
@@ -221,7 +221,7 @@ export default function Home() {
           </div>
 
           <div className="self-start">
-            <table className="w-full text-left text-[0.9375rem]">
+            <table className="w-full text-left text-small">
               <caption className="text-left text-sm text-ink-faint pb-3">
                 DeepFakeFace dataset, 100 real and 99 fake faces, not used in training.
               </caption>

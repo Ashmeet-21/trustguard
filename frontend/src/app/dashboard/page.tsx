@@ -114,7 +114,7 @@ export default function DashboardPage() {
     <div className="max-w-6xl mx-auto px-6 py-10 md:py-14">
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <h1 className="text-[2rem] md:text-[2.5rem] font-bold leading-tight tracking-[-0.02em] text-ink">Dashboard</h1>
+          <h1 className="page-title">Dashboard</h1>
           <p className="mt-2 text-ink-soft">Every check run on this TrustGuard server, newest first.</p>
         </div>
         <Link href="/verify" className="btn self-start sm:self-auto">Start a verification</Link>
@@ -198,7 +198,7 @@ export default function DashboardPage() {
         <h2 className="text-lg font-bold text-ink">Recent checks</h2>
         {activity.length > 0 ? (
           <div className="mt-4 overflow-x-auto">
-            <table className="w-full min-w-[40rem] text-left text-[0.9375rem]">
+            <table className="w-full min-w-[40rem] text-left text-small">
               <thead>
                 <tr className="border-b-2 border-ink">
                   <th scope="col" className="py-2.5 pr-4 font-semibold">When</th>
