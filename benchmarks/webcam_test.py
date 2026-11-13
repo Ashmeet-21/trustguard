@@ -5,7 +5,8 @@ Phase 1 - you look at the camera:            venv\Scripts\python -m benchmarks.w
 Phase 2 - hold a phone showing a photo of
           your face (or a printed photo):    venv\Scripts\python -m benchmarks.webcam_test spoof
 
-Takes 10 shots, 4 seconds apart (move your head a little / change the light between shots).
+Takes 10 shots, 4 seconds apart. For 'spoof' ONLY the phone/print may show a face: keep your own
+face out of the camera view and tilt / move the phone between shots.
 Frames are saved in datasets/webcam_test/ (gitignored, stays on this laptop).
 """
 
@@ -30,8 +31,9 @@ def main(mode):
     cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
     for _ in range(20):  # let the camera adjust exposure
         cap.read()
-    print(f"\nMode: {mode}. First shot in 8 seconds - get ready.", flush=True)
-    time.sleep(8)
+    wait = 20 if mode == "spoof" else 8  # spoof needs time to set up the phone
+    print(f"\nMode: {mode}. First shot in {wait} seconds - get ready.", flush=True)
+    time.sleep(wait)
     passed = 0
     for i in range(SHOTS):
         for _ in range(5):  # drop stale buffered frames
@@ -44,7 +46,10 @@ def main(mode):
         r = detector.detect_liveness(frame)
         c = r["checks"]
         passed += r["is_live"]
-        print(f"shot {i + 1:2d}: face={c['face_detected']!s:5} P(live)={c['model_live_probability']:.3f} "
+        bb = c["face_bbox"]  # where the face is: lets us see WHICH face was scored
+        where = (f"face x={(bb['x_min'] + bb['x_max']) / 2:.2f} y={(bb['y_min'] + bb['y_max']) / 2:.2f} "
+                 f"w={bb['width_pct']:.2f}") if bb else "no face"
+        print(f"shot {i + 1:2d}: {where:30} P(live)={c['model_live_probability']:.3f} "
               f"score={r['liveness_score']:.2f} -> {r['classification']} ({r['risk_level']})", flush=True)
         time.sleep(GAP)
     cap.release()
