@@ -27,7 +27,7 @@ def _make_face_like_image():
 def test_detector_initializes(detector):
     """LivenessDetector should initialize without errors."""
     assert detector is not None
-    assert detector.threshold == 0.7
+    assert detector.threshold == 0.12
 
 
 def test_detect_from_numpy_array(detector):
@@ -90,3 +90,13 @@ def test_risk_level_mapping(detector):
     assert detector._get_risk_level(0.6) == "MEDIUM"
     assert detector._get_risk_level(0.4) == "HIGH"
     assert detector._get_risk_level(0.2) == "CRITICAL"
+
+
+def test_model_probability_returned_and_no_face_scores_zero(detector):
+    """The pretrained model's probability is reported; an image with no face gets score 0."""
+    blank = np.full((240, 240, 3), 128, dtype=np.uint8)
+    result = detector.detect_liveness(blank)
+    assert 0.0 <= result["checks"]["model_live_probability"] <= 1.0
+    assert result["checks"]["face_detected"] is False
+    assert result["liveness_score"] == 0.0
+    assert result["is_live"] is False

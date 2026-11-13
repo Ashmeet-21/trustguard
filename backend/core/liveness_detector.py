@@ -9,12 +9,18 @@ Think of it like a bouncer at a club checking if your ID photo is real:
 - Are the edges normal or too smooth/sharp like a screenshot?  (Edge Check)
 - Is the image in focus like a real camera, not blurry like a photo-of-a-photo?  (Sharpness Check)
 
-Each check gives a score 0.0 (fake) to 1.0 (real).
-We average them all → final liveness score. Above 0.7 = LIVE, below = SPOOF.
+The final score comes from a small pretrained model (MiniFASNetV2, 1.7 MB ONNX) that looks at the
+face and says "live person / printed photo / screen replay". It was benchmarked on CASIA-FASD
+(benchmarks/LIVENESS_RESULTS.md): AUC 0.99. The six hand-made checks above did NOT work
+(AUC 0.52), so they are still computed and returned for explanation but no longer decide anything.
+Score 0.0 (fake) to 1.0 (real). 0.7 or more = LIVE, below = SPOOF.
 """
+
+from pathlib import Path
 
 import cv2
 import numpy as np
+import onnxruntime as ort
 from PIL import Image
 from typing import Dict, Union
 from loguru import logger
@@ -26,16 +32,9 @@ from backend.utils import config
 
 class LivenessDetector:
 
-    # How much each check matters (adds up to 1.0)
-    # Face quality is the strongest signal — MediaPipe landmark depth separates 3D faces from flat photos
-    WEIGHTS = {
-        "face_quality": 0.25,
-        "texture": 0.20,
-        "frequency": 0.15,
-        "color": 0.15,
-        "edge": 0.10,
-        "sharpness": 0.15,
-    }
+    MODEL_PATH = Path(__file__).parent.parent / "models" / "minifasnet_v2.onnx"
+    CROP_SCALE = 2.7   # the model wants the face plus 2.7x margin around it
+    MODEL_SIZE = 80
 
     def __init__(self):
         # MediaPipe Face Mesh — Google's free face detector
@@ -45,7 +44,9 @@ class LivenessDetector:
             max_num_faces=1,            # We only need one face
             min_detection_confidence=0.3,  # Lower threshold for webcam selfies
         )
-        self.threshold = config.LIVENESS_THRESHOLD  # Default 0.7
+        self.spoof_model = ort.InferenceSession(str(self.MODEL_PATH), providers=["CPUExecutionProvider"])
+        # Model probability of "live" at which a face counts as LIVE (picked on CASIA train: equal error point)
+        self.threshold = config.LIVENESS_THRESHOLD  # Default 0.12
         logger.info("Liveness detector initialized (threshold={})", self.threshold)
 
     def detect_liveness(self, image_input: Union[str, Image.Image, np.ndarray]) -> Dict:
@@ -67,29 +68,19 @@ class LivenessDetector:
         # Step 2: Face quality — 3D depth from MediaPipe landmarks (best single signal)
         face_quality_score = self._check_face_quality(landmarks)
 
-        # Step 3-7: Run image-based checks — each returns 0.0 (likely fake) to 1.0 (likely real)
+        # Step 3-7: Run image-based checks (informational only, see top of file) — each returns 0.0 (likely fake) to 1.0 (likely real)
         texture_score = self._check_texture(region)
         frequency_score = self._check_frequency(region)
         color_score = self._check_color(region)
         edge_score = self._check_edges(region)
         sharpness_score = self._check_sharpness(region)
 
-        # Combine all scores using weights
-        liveness_score = (
-            self.WEIGHTS["face_quality"] * face_quality_score
-            + self.WEIGHTS["texture"] * texture_score
-            + self.WEIGHTS["frequency"] * frequency_score
-            + self.WEIGHTS["color"] * color_score
-            + self.WEIGHTS["edge"] * edge_score
-            + self.WEIGHTS["sharpness"] * sharpness_score
-        )
+        # The pretrained model decides. No face found = nothing to check = 0.
+        live_probability = self._spoof_model_live_probability(bgr, face_bbox) if face_detected else 0.0
 
-        # No face found? Reduce score — but don't be too harsh, webcam quality varies
-        if not face_detected:
-            liveness_score *= 0.6
-
-        liveness_score = round(float(liveness_score), 4)
-        is_live = liveness_score >= self.threshold
+        # Scale so that the threshold probability lands on score 0.7 (the cut-off the rest of the app uses)
+        liveness_score = round(float(min(1.0, live_probability * 0.7 / self.threshold)), 4)
+        is_live = liveness_score >= 0.7
 
         return {
             "is_live": is_live,
@@ -97,6 +88,7 @@ class LivenessDetector:
             "checks": {
                 "face_detected": face_detected,
                 "face_bbox": face_bbox,
+                "model_live_probability": round(float(live_probability), 4),
                 "face_quality_score": round(float(face_quality_score), 4),
                 "texture_score": round(float(texture_score), 4),
                 "frequency_score": round(float(frequency_score), 4),
@@ -107,6 +99,33 @@ class LivenessDetector:
             "risk_level": self._get_risk_level(liveness_score),
             "classification": "LIVE" if is_live else "SPOOF",
         }
+
+    # ── Pretrained anti-spoof model ─────────────────────────
+
+    def _spoof_model_live_probability(self, bgr: np.ndarray, face_bbox: Dict) -> float:
+        """
+        Crop the face with a wide margin, resize to 80x80, ask MiniFASNetV2.
+        It returns 3 probabilities: [print attack, live, screen replay]. We return P(live).
+        Note: the model wants raw 0-255 pixels in BGR order (not divided by 255).
+        """
+        h, w = bgr.shape[:2]
+        x0, x1 = face_bbox["x_min"] * w, face_bbox["x_max"] * w
+        y0, y1 = face_bbox["y_min"] * h, face_bbox["y_max"] * h
+        box_w, box_h = max(x1 - x0, 1.0), max(y1 - y0, 1.0)
+
+        # Biggest margin that still fits inside the image
+        scale = min((h - 1) / box_h, (w - 1) / box_w, self.CROP_SCALE)
+        crop_w, crop_h = box_w * scale, box_h * scale
+        left = int(round(min(max((x0 + x1) / 2 - crop_w / 2, 0), w - crop_w)))
+        top = int(round(min(max((y0 + y1) / 2 - crop_h / 2, 0), h - crop_h)))
+        crop = bgr[top:top + int(round(crop_h)), left:left + int(round(crop_w))]
+
+        crop = cv2.resize(crop, (self.MODEL_SIZE, self.MODEL_SIZE))
+        x = crop.astype(np.float32).transpose(2, 0, 1)[None]  # HWC -> NCHW
+        logits = self.spoof_model.run(None, {"input": x})[0][0]
+        probs = np.exp(logits - logits.max())
+        probs /= probs.sum()
+        return float(probs[1])
 
     # ── Helper: Load Image ──────────────────────────────────
 

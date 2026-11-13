@@ -32,7 +32,7 @@ DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./trustguard.db")
 
 # Detection Thresholds (clamped to valid range)
 DEEPFAKE_THRESHOLD = max(0.0, min(1.0, float(os.getenv("DEEPFAKE_THRESHOLD", "0.5"))))
-LIVENESS_THRESHOLD = max(0.0, min(1.0, float(os.getenv("LIVENESS_THRESHOLD", "0.7"))))
+LIVENESS_THRESHOLD = max(0.0, min(1.0, float(os.getenv("LIVENESS_THRESHOLD", "0.12"))))
 
 # File Upload
 MAX_UPLOAD_SIZE = int(os.getenv("MAX_UPLOAD_SIZE", "10485760"))  # 10MB

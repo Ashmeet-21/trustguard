@@ -95,7 +95,8 @@ reproduce with `python -m benchmarks.run_benchmark` (`--compare` for the model c
 - Returns confidence score + risk level (LOW/MEDIUM/HIGH/CRITICAL)
 
 ### 2. Liveness Detection
-Six independent checks on every image:
+The score comes from a pretrained anti-spoofing model (MiniFASNetV2, 1.7 MB ONNX). The six checks below are still
+computed and returned for explanation, but they are **not** used for the decision (see the benchmark note):
 
 | Check | Technique | What It Catches |
 |-------|-----------|-----------------|
@@ -108,9 +109,10 @@ Six independent checks on every image:
 
 Weighted scoring → single liveness score with LIVE/SPOOF classification.
 
-**Benchmarked, and it does not work yet** (`benchmarks/LIVENESS_RESULTS.md`): on CASIA-FASD (print, cut-photo and
-video-replay attacks, people never seen in tuning) the score is AUC 0.52 and 99.8% of attacks pass at the 0.7 threshold.
-So its risk-engine weight was cut from 25% to 10%. Next step: a pretrained anti-spoofing model, benchmarked the same way.
+**Benchmarked** (`benchmarks/LIVENESS_RESULTS.md`, CASIA-FASD: print, cut-photo and video-replay attacks, people never seen in
+tuning). The six hand-made checks alone scored AUC 0.52 and let 99.8% of attacks through. The pretrained model scores AUC 0.99
+on the held-out people: 6.3% of real faces rejected, 6.7% of attacks accepted. Caveats: old 256px face crops, and the model's
+own training data is not published, so real-webcam accuracy is still unmeasured.
 
 ### 3. Voice Analysis
 - **Primary**: HuggingFace Inference API (`AST-ASVspoof2019` model)
@@ -130,10 +132,10 @@ Rule-based analysis — no ML training required:
 
 ```
 Agent Scores ──► Weighted Average ──► Trust Score (0-100) ──► Decision
-                 ├── Deepfake:  40%
-                 ├── Liveness:  10%     PASS:   score >= 70, no critical agents
+                 ├── Deepfake:  30%
+                 ├── Liveness:  25%     PASS:   score >= 70, no critical agents
                  ├── Voice:     25%     REVIEW: score 40-69 or 1 high-risk agent
-                 └── Behavior:  25%     FAIL:   score < 40 or critical agent
+                 └── Behavior:  20%     FAIL:   score < 40 or critical agent
 ```
 
 **Quality gates** run after the agents and can only make the decision stricter:
@@ -225,12 +227,12 @@ Runs both backend (port 8000) and frontend (port 3000).
 ## Running Tests
 
 ```bash
-# All 105 tests
+# All 106 tests
 pytest tests/ -v
 
 # By module
 pytest tests/test_deepfake_detector.py -v       # Deepfake detector (9 tests)
-pytest tests/test_liveness_detector.py -v        # Liveness detector (7 tests)
+pytest tests/test_liveness_detector.py -v        # Liveness detector (8 tests)
 pytest tests/test_voice_detector.py -v           # Voice detector (6 tests)
 pytest tests/test_behavior_analyzer.py -v        # Behavior analyzer (6 tests)
 pytest tests/test_risk_engine.py -v              # Risk engine (8 tests)
@@ -346,7 +348,7 @@ trustguard/
 │   │       └── Providers.tsx          # Client-side provider wrapper
 │   ├── next.config.ts                # API proxy rewrites
 │   └── package.json
-├── tests/                            # 105 tests (17 test files)
+├── tests/                            # 106 tests (17 test files)
 ├── Dockerfile                        # Backend container
 ├── docker-compose.yml                # Full-stack orchestration
 ├── requirements.txt                  # Python dependencies
@@ -369,7 +371,7 @@ trustguard/
 | Auth | python-jose + passlib | JWT tokens, bcrypt password hashing |
 | Database | SQLAlchemy + SQLite | Zero setup, swappable to PostgreSQL |
 | Rate Limiting | slowapi | Per-IP request throttling |
-| Testing | pytest | 105 tests covering detectors, API, orchestration, security |
+| Testing | pytest | 106 tests covering detectors, API, orchestration, security |
 | Logging | Loguru | Structured logging with rotation |
 
 ---
