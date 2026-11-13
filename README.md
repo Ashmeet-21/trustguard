@@ -70,7 +70,7 @@ reproduce with `python -m benchmarks.run_benchmark` (`--compare` for the model c
 │  │   Creates session → routes data to agents → collects results   │
 │  │                                                                 │
 │  ├── Agent 1: Deepfake Detector    (ViT, picked by benchmark)     │
-│  ├── Agent 2: Liveness Detector    (6 OpenCV/MediaPipe checks)    │
+│  ├── Agent 2: Liveness Detector    (MiniFASNetV2 anti-spoof model)│
 │  ├── Agent 3: Voice Detector       (HF API + spectral fallback)   │
 │  └── Agent 4: Behavior Analyzer    (keystroke + mouse patterns)   │
 │                                                                    │
@@ -98,7 +98,7 @@ reproduce with `python -m benchmarks.run_benchmark` (`--compare` for the model c
 The score comes from a pretrained anti-spoofing model (MiniFASNetV2, 1.7 MB ONNX). The six checks below are still
 computed and returned for explanation, but they are **not** used for the decision (see the benchmark note):
 
-| Check | Technique | What It Catches |
+| Check | Technique | Intended to catch (not validated — benchmarked AUC 0.52) |
 |-------|-----------|-----------------|
 | Face Detection | MediaPipe Face Mesh | No face = spoof |
 | Texture Analysis | Local Binary Patterns | Flat printed photos |
@@ -365,7 +365,7 @@ trustguard/
 | Frontend | Next.js 16 + React 19 | App router, TypeScript, server components |
 | Styling | Tailwind CSS v4 | Dark theme with cyan→purple gradient accents |
 | Deepfake Detection | ViT exported to int8 ONNX, run with onnxruntime | Picked by [benchmark](benchmarks/MODEL_COMPARISON.md); 24 MB, no PyTorch or paid API in production |
-| Liveness Detection | OpenCV + MediaPipe | Lightweight, no GPU needed, 6 explainable checks |
+| Liveness Detection | MiniFASNetV2 (ONNX) + MediaPipe | 1.7 MB pretrained model, CPU only; MediaPipe finds the face |
 | Voice Detection | HuggingFace API + scipy | API primary, local spectral fallback |
 | Behavioral Analysis | NumPy | Pure rule-based, no training data needed |
 | Auth | python-jose + passlib | JWT tokens, bcrypt password hashing |
