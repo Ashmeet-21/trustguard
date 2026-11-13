@@ -27,10 +27,10 @@ class RiskEngine:
     """Aggregates all agent scores into a single trust score and decision."""
 
     WEIGHTS = {
-        "image_agent": 0.30,
-        "video_agent": 0.25,
+        "image_agent": 0.40,
+        "video_agent": 0.10,  # liveness: weak on full-size photos (AUC 0.80, see benchmarks/LIVENESS_RESULTS.md)
         "voice_agent": 0.25,
-        "behavior_agent": 0.20,
+        "behavior_agent": 0.25,
     }
 
     def calculate(self, signals: dict) -> dict:

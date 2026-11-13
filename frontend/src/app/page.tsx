@@ -17,14 +17,14 @@ const CHECKS = [
     how: "Vision Transformer trained on images from thousands of generators",
     catches: "AI-generated and AI-edited faces",
     misses: "Face swaps onto real photos",
-    weight: 30,
+    weight: 40,
   },
   {
     name: "A live person",
     how: "A small pretrained anti-spoofing model looks at the face and its surroundings",
     catches: "Some printed photos and screen replays. It stopped 93% of attacks on small face crops (CASIA) but only 37% on full-size photos (CelebA-Spoof). Treat it as one weak signal",
     misses: "Most phone-screen replays in normal photos, high-quality masks",
-    weight: 25,
+    weight: 10,
   },
   {
     name: "Human voice",
@@ -38,7 +38,7 @@ const CHECKS = [
     how: "Time between keys, rhythm, mouse speed and path",
     catches: "Scripts and bots filling in forms",
     misses: "A person typing on someone else’s behalf",
-    weight: 20,
+    weight: 25,
   },
 ];
 
@@ -49,7 +49,7 @@ const STEPS = [
   },
   {
     title: "Scores are weighted into a trust score",
-    body: "Face 30%, liveness 25%, voice 25%, typing 20%. If a check is missing, its weight is shared among the others.",
+    body: "Face 40%, liveness 10%, voice 25%, typing 25%. If a check is missing, its weight is shared among the others.",
   },
   {
     title: "Rules set the decision",

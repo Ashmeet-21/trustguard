@@ -133,10 +133,10 @@ Rule-based analysis — no ML training required:
 
 ```
 Agent Scores ──► Weighted Average ──► Trust Score (0-100) ──► Decision
-                 ├── Deepfake:  30%
-                 ├── Liveness:  25%     PASS:   score >= 70, no critical agents
+                 ├── Deepfake:  40%
+                 ├── Liveness:  10%     PASS:   score >= 70, no critical agents
                  ├── Voice:     25%     REVIEW: score 40-69 or 1 high-risk agent
-                 └── Behavior:  20%     FAIL:   score < 40 or critical agent
+                 └── Behavior:  25%     FAIL:   score < 40 or critical agent
 ```
 
 **Quality gates** run after the agents and can only make the decision stricter:

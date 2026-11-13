@@ -3,6 +3,8 @@
 Read this first. It is the single source of truth for project state, so new sessions don't need to re-explore the codebase.
 **Keep it updated** when something meaningful changes (new feature, status change, decision made).
 
+**Product direction + roadmap with acceptance criteria: `PRODUCT.md` (head-turn challenge spec = R1).**
+
 ## What it is
 Multi-modal identity verification platform (portfolio project by Ashmeet Singh, GitHub: Ashmeet-21/trustguard, public, branch `master`).
 4 detection agents → session orchestrator → weighted risk engine → PASS / REVIEW / FAIL, with quality gates and audit trail.
@@ -35,7 +37,7 @@ docker-compose up --build                       # both services
   - `liveness_detector.py` — score = pretrained MiniFASNetV2 (`backend/models/minifasnet_v2.onnx`, 1.7 MB, raw 0-255 BGR 80x80, 2.7x face crop from MediaPipe box, P(live)=class 1). P(live) is scaled so `LIVENESS_THRESHOLD`=0.12 → score 0.7; `is_live = score >= 0.7`; no face → 0. The old 6 checks (LBP, FFT, YCrCb, Canny, Laplacian, face mesh) are still computed and returned but do NOT decide (AUC 0.52). Risk: ≥0.7 LOW, ≥0.5 MEDIUM, ≥0.3 HIGH, else CRITICAL.
   - `voice_detector.py` — HF API (`MattyB95/AST-ASVspoof2019-Synthetic-Voice-Detection`) primary; scipy spectral fallback (flatness, zero-crossing, energy variation).
   - `behavior_analyzer.py` — rule-based: typing speed/rhythm, mouse speed/straightness. Human if score ≥ 0.6.
-  - `risk_engine.py` — weights image 0.30, video(=liveness) 0.25, voice 0.25, behavior 0.20 (liveness weight briefly 0.10 on 2026-11-13 until the model swap); renormalized over available signals. Agent "FLAGGED" if score < 60. FAIL: score<40 or any CRITICAL or 2+ flagged. REVIEW: score<70 or 1 flagged. else PASS.
+  - `risk_engine.py` — weights image 0.40, video(=liveness) 0.10, voice 0.25, behavior 0.25 (liveness cut 0.25 -> 0.10 on 2026-11-13: AUC 0.80 on full photos); renormalized over available signals. Agent "FLAGGED" if score < 60. FAIL: score<40 or any CRITICAL or 2+ flagged. REVIEW: score<70 or 1 flagged. else PASS.
   - `session_orchestrator.py` — in-memory sessions with expiry: `create_session(user_id)`, `run_session(...)`, `get_session_state`. Sessions have an owner (`user_id`, None = anonymous) and run **once** (status must be "created"). Any crashed agent → PASS downgraded to REVIEW (fail closed).
   - `quality_gates.py` — replay (SHA256 seen in another session), min 2 signals, signal agreement (risk gap ≥ 2). `apply_gates()` enforces them: replay → FAIL, other failures → PASS becomes REVIEW.
   - `audit_reporter.py` — JSON reports in `backend/audit_reports/` + DB AuditLog. Reports store `user_id`; only the owner can read them. `get_report` only accepts UUIDs (path traversal guard).
@@ -68,9 +70,9 @@ docker-compose up --build                       # both services
   - History: the HF API failed with 401 (bad token) then 402 (free credits used up) → face check returned 503. Before the fail-closed fix, this was hidden (every image silently called REAL).
   - Dockerfile no longer copies `.env.example` into the image (it carried a public JWT secret fallback).
 - Voice model `MattyB95/AST-ASVspoof2019...` is NOT served by any HF inference provider → voice always uses the local spectral fallback.
-- `datasets/test_images/test_face.jpg` scores liveness 0.148 (SPOOF) locally and in prod → liveness thresholds need calibration.
+- `datasets/test_images/test_face.jpg` has no detectable face (that is why it scored 0.148 on the old liveness checks); liveness was since replaced and benchmarked, see Honest gaps.
 - GitHub repo homepage + topics set; README has live links + real CI badge.
-- CI: `.github/workflows/ci.yml` triggers on `master`; green on every push since 2026-10-08 (105 tests).
+- CI: `.github/workflows/ci.yml` triggers on `master`; green on every push since 2026-10-08 (105 tests then; 106 now).
 
 ## Known gotchas
 - bcrypt must be pinned `4.1.3` (5.x breaks passlib).
@@ -84,7 +86,7 @@ docker-compose up --build                       # both services
 - 199 images is a small test set — enough to disprove the 99% claim, not a full evaluation.
 - **Liveness history (2026-11-13, `benchmarks/LIVENESS_RESULTS.md`):** the original 6 hand-made checks were benchmarked on CASIA-FASD (print/cut/replay attacks, unseen people): AUC 0.52, 99.8% of attacks passed, each check alone AUC 0.33-0.68; re-weighting got only 0.69. Earlier note "liveness wrongly flags real faces" was wrong (test_face.jpg had no face detected). Replaced by the pretrained MiniFASNetV2 (see next bullet).
 - **Liveness model reality check (2026-11-13):** MiniFASNetV2 scores AUC 0.986 on CASIA crops, but on 800 full-size CelebA-Spoof photos (production path) only **AUC 0.80, 63% of attacks accepted at 0.12, 4.9% of real rejected; equal-error ~30%**. Threshold 0.12 was fitted on CASIA and is too lenient for normal photos. Webcam check: 8/10 live shots LIVE (2 no face); attack test contaminated, only 2 valid attack shots, both passed (face was only 12% of frame, the app would reject that as too small). Treat liveness as a weak signal. Render dashboard may still hold LIVENESS_THRESHOLD=0.7 -> must be 0.12 or deleted.
-- Voice and behaviour thresholds and risk weights (30/25/25/20) are hand-set; voice is NOT validated against any spoof dataset.
+- Voice and behaviour thresholds and risk weights (40/10/25/25) are hand-set; voice is NOT validated against any spoof dataset.
 
 ## Known limitations (not fixed yet)
 - Routes are `async def` but call blocking ML inference → one slow request blocks the server. Fix = sync `def` routes, BUT mediapipe FaceMesh isn't thread-safe, so needs a lock first.
@@ -104,8 +106,8 @@ docker-compose up --build                       # both services
 6. [ ] **NEXT: walk user through backend file by file and quiz them** — order: session_orchestrator → detectors → risk_engine → quality_gates → behavior_analyzer. Explain each security fix in plain English with line refs, then 3–4 interview questions per file. User agreed to this (2026-10-08).
 7. [ ] Optional: async routes block on ML (needs mediapipe lock), Redis for limiter/sessions, spoof dataset for liveness, validation set for threshold tuning.
 
-## Liveness model swap (2026-11-13, branch antispoof-model = 4 commits on top of master, NOT pushed)
-- Done: MiniFASNetV2 integrated (commit 1186882), weights back to 30/25/25/20, landing + README copy, benchmark scripts/results, colour tokens, ServerWakeNotice (pings /health), typed speech API. 106 tests pass, frontend builds.
+## Liveness model swap (2026-11-13, branch liveness-weight-challenge = stacked on antispoof-model, NOT pushed)
+- Done: MiniFASNetV2 integrated (commit 1186882), weights 40/10/25/25 (liveness lowered after full-photo benchmark), landing + README copy, benchmark scripts/results, colour tokens, ServerWakeNotice (pings /health), typed speech API. 106 tests pass, frontend builds.
 - Full-size check done (benchmarks/celeba_spoof_eval.py): AUC 0.80, see Honest gaps. Open decision: lower liveness weight (25% is high for a 63%-leak signal), pick a stricter threshold on a SEPARATE tuning set, or try another model / active challenge.
 - Before deploy (ask user): set Render env LIVENESS_THRESHOLD=0.12 or delete it (0.7 would reject ~31% of real faces). Then merge antispoof-model into master, push once.
 - Open: a no-face selfie is blocked on /verify with a retake message (fine); ResNet18 (CelebA-Spoof, non-commercial, test AUC 0.85) compared but not used.
