@@ -22,8 +22,8 @@ const CHECKS = [
   {
     name: "A live person",
     how: "A small pretrained anti-spoofing model looks at the face and its surroundings",
-    catches: "Printed photos and photos of screens. On a public test set it stopped about 93% of them and wrongly rejected about 6% of real faces",
-    misses: "High-quality masks, and cameras unlike the ones it was tested on",
+    catches: "Some printed photos and screen replays. It stopped 93% of attacks on small face crops (CASIA) but only 37% on full-size photos (CelebA-Spoof). Treat it as one weak signal",
+    misses: "Most phone-screen replays in normal photos, high-quality masks",
     weight: 25,
   },
   {

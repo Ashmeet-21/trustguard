@@ -46,3 +46,24 @@ Notes
   was trained on CelebA-Spoof only, so its 0.85-0.87 is the clean out-of-dataset number. Treat MiniFASNet's 0.986 as an
   upper bound until it is checked on our own webcam photos.
 - CASIA frames are old, 256px face crops. Real-webcam performance is still unmeasured.
+
+# Full-size photos: CelebA-Spoof sample (2026-11-13)
+
+CASIA frames are 256px face crops. This check uses normal photos with background (median 450x600), like a
+webcam selfie, with the shipped detector (MediaPipe finds the face, MiniFASNetV2 scores it, threshold 0.12 as
+chosen on CASIA). 800 images from 4 random test files of `Ar4ikov/celebA_spoof`: 454 live, 346 spoof
+(prints, phone/screen replays, masks; no sub-type labels). Script: `benchmarks/celeba_spoof_eval.py`, scores
+in `benchmarks/celeba_spoof_scores.csv`.
+
+| | Result |
+|---|---|
+| Face found | 98.5% of real, 99.4% of spoof photos |
+| AUC (face found) | **0.80** (0.75-0.82 per file) |
+| Real faces rejected at 0.12 | 4.9% |
+| **Spoofs accepted at 0.12** | **63.1%** |
+
+So the CASIA result (AUC 0.986, 6.7% of attacks accepted) did NOT carry over to full-size photos. The 0.12
+threshold, picked on CASIA, is too lenient here. AUC 0.80 is the real ceiling of this model on this data; no
+threshold gets both errors low. Honest summary: it catches some attacks, not a reliable defence on its own.
+Webcam check on this laptop (10 live shots: 8 LIVE, 2 no face; the attack test was contaminated, only 2 shots
+were valid attacks and both passed) agrees that it is not strong against phone-screen replays.

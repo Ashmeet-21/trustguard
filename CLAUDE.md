@@ -83,7 +83,7 @@ docker-compose up --build                       # both services
   - Script reads remote zips via `HfFileSystem` (only sampled images downloaded to gitignored `datasets/deepfakeface/`). pyarrow/psutil installed in venv only for one-off checks (not in requirements).
 - 199 images is a small test set — enough to disprove the 99% claim, not a full evaluation.
 - **Liveness history (2026-11-13, `benchmarks/LIVENESS_RESULTS.md`):** the original 6 hand-made checks were benchmarked on CASIA-FASD (print/cut/replay attacks, unseen people): AUC 0.52, 99.8% of attacks passed, each check alone AUC 0.33-0.68; re-weighting got only 0.69. Earlier note "liveness wrongly flags real faces" was wrong (test_face.jpg had no face detected). Replaced by the pretrained MiniFASNetV2 (see next bullet).
-- Liveness model fix (2026-11-13): MiniFASNetV2 got AUC 0.986 on CASIA test (6.3% real rejected / 6.7% attacks accepted), but its training data is unpublished (CASIA overlap not ruled out) and CASIA frames are old 256px crops. Real webcam accuracy unmeasured: user should test ~10 selfies + ~10 photos of a screen/print. Render dashboard may still hold LIVENESS_THRESHOLD=0.7 → must be 0.12 or deleted.
+- **Liveness model reality check (2026-11-13):** MiniFASNetV2 scores AUC 0.986 on CASIA crops, but on 800 full-size CelebA-Spoof photos (production path) only **AUC 0.80, 63% of attacks accepted at 0.12, 4.9% of real rejected; equal-error ~30%**. Threshold 0.12 was fitted on CASIA and is too lenient for normal photos. Webcam check: 8/10 live shots LIVE (2 no face); attack test contaminated, only 2 valid attack shots, both passed (face was only 12% of frame, the app would reject that as too small). Treat liveness as a weak signal. Render dashboard may still hold LIVENESS_THRESHOLD=0.7 -> must be 0.12 or deleted.
 - Voice and behaviour thresholds and risk weights (30/25/25/20) are hand-set; voice is NOT validated against any spoof dataset.
 
 ## Known limitations (not fixed yet)
@@ -106,7 +106,7 @@ docker-compose up --build                       # both services
 
 ## Liveness model swap (2026-11-13, branch antispoof-model = 4 commits on top of master, NOT pushed)
 - Done: MiniFASNetV2 integrated (commit 1186882), weights back to 30/25/25/20, landing + README copy, benchmark scripts/results, colour tokens, ServerWakeNotice (pings /health), typed speech API. 106 tests pass, frontend builds.
-- CASIA frames are 256px face crops, so the benchmark never used the full 2.7x crop margin that webcam frames get. NOT yet tested on real webcam photos: run locally, try ~10 selfies + ~10 photos of a phone screen / print, note is_live + score.
+- Full-size check done (benchmarks/celeba_spoof_eval.py): AUC 0.80, see Honest gaps. Open decision: lower liveness weight (25% is high for a 63%-leak signal), pick a stricter threshold on a SEPARATE tuning set, or try another model / active challenge.
 - Before deploy (ask user): set Render env LIVENESS_THRESHOLD=0.12 or delete it (0.7 would reject ~31% of real faces). Then merge antispoof-model into master, push once.
 - Open: a no-face selfie is blocked on /verify with a retake message (fine); ResNet18 (CelebA-Spoof, non-commercial, test AUC 0.85) compared but not used.
 

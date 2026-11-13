@@ -109,10 +109,11 @@ computed and returned for explanation, but they are **not** used for the decisio
 
 Weighted scoring → single liveness score with LIVE/SPOOF classification.
 
-**Benchmarked** (`benchmarks/LIVENESS_RESULTS.md`, CASIA-FASD: print, cut-photo and video-replay attacks, people never seen in
-tuning). The six hand-made checks alone scored AUC 0.52 and let 99.8% of attacks through. The pretrained model scores AUC 0.99
-on the held-out people: 6.3% of real faces rejected, 6.7% of attacks accepted. Caveats: old 256px face crops, and the model's
-own training data is not published, so real-webcam accuracy is still unmeasured.
+**Benchmarked on two public sets** (`benchmarks/LIVENESS_RESULTS.md`). The six hand-made checks alone scored AUC 0.52 and let
+99.8% of attacks through (CASIA-FASD). The pretrained model scores AUC 0.986 on CASIA's small face crops (6.7% of attacks
+accepted), but on 800 full-size photos from CelebA-Spoof (like a webcam selfie) it scores **AUC 0.80 and accepts 63% of
+attacks** (4.9% of real faces rejected). So it is a weak signal, not a defence on its own: that is why four checks and
+quality gates exist. Next steps: a better model, or an active challenge (blink / head turn).
 
 ### 3. Voice Analysis
 - **Primary**: HuggingFace Inference API (`AST-ASVspoof2019` model)
