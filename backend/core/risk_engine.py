@@ -27,10 +27,10 @@ class RiskEngine:
     """Aggregates all agent scores into a single trust score and decision."""
 
     WEIGHTS = {
-        "image_agent": 0.30,
-        "video_agent": 0.25,
+        "image_agent": 0.40,
+        "video_agent": 0.10,  # liveness: benchmark showed it does not catch print/replay attacks
         "voice_agent": 0.25,
-        "behavior_agent": 0.20,
+        "behavior_agent": 0.25,
     }
 
     def calculate(self, signals: dict) -> dict:

@@ -108,6 +108,10 @@ Six independent checks on every image:
 
 Weighted scoring → single liveness score with LIVE/SPOOF classification.
 
+**Benchmarked, and it does not work yet** (`benchmarks/LIVENESS_RESULTS.md`): on CASIA-FASD (print, cut-photo and
+video-replay attacks, people never seen in tuning) the score is AUC 0.52 and 99.8% of attacks pass at the 0.7 threshold.
+So its risk-engine weight was cut from 25% to 10%. Next step: a pretrained anti-spoofing model, benchmarked the same way.
+
 ### 3. Voice Analysis
 - **Primary**: HuggingFace Inference API (`AST-ASVspoof2019` model)
 - **Fallback**: Local spectral analysis (3 checks: spectral flatness, zero-crossing rate, energy variation)
@@ -126,10 +130,10 @@ Rule-based analysis — no ML training required:
 
 ```
 Agent Scores ──► Weighted Average ──► Trust Score (0-100) ──► Decision
-                 ├── Deepfake:  30%
-                 ├── Liveness:  25%     PASS:   score >= 70, no critical agents
+                 ├── Deepfake:  40%
+                 ├── Liveness:  10%     PASS:   score >= 70, no critical agents
                  ├── Voice:     25%     REVIEW: score 40-69 or 1 high-risk agent
-                 └── Behavior:  20%     FAIL:   score < 40 or critical agent
+                 └── Behavior:  25%     FAIL:   score < 40 or critical agent
 ```
 
 **Quality gates** run after the agents and can only make the decision stricter:
