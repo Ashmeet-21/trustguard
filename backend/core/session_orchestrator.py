@@ -13,6 +13,7 @@ delegates work to each detection agent, collects their reports, and then asks
 the risk engine to make the final call."
 """
 
+import random
 import time
 import uuid
 import threading
@@ -24,6 +25,23 @@ from loguru import logger
 # Session limits
 MAX_SESSIONS = 10000
 SESSION_TTL_HOURS = 24
+
+# Head-turn challenge (R1). Yaw = nose position between the face edges, minus 0.5 (see LivenessDetector.head_yaw).
+# The camera preview + snapshot are mirrored, so turning towards your LEFT shoulder moves the nose to image-left (negative).
+# NOTE: these numbers are first guesses, to be checked on real webcam frames.
+CHALLENGE_TTL_MINUTES = 10   # long enough for photo + voice + typing steps
+FRONT_MAX_YAW = 0.15         # front photo must be roughly straight (real webcam fronts ranged -0.08 .. +0.14)
+TURN_MIN_YAW = 0.10          # turned photo must be this much further than the front photo, in the asked direction
+
+
+def head_turn_passes(asked: str, front_yaw: float, turn_yaw: float):
+    """The head-turn rule in one place (also used by benchmarks/headturn_test.py). Returns (passed, reason)."""
+    if abs(front_yaw) > FRONT_MAX_YAW:
+        return False, "front photo not straight"
+    change = turn_yaw - front_yaw  # compared with the user's own front photo; left = negative
+    if (change <= -TURN_MIN_YAW) if asked == "left" else (change >= TURN_MIN_YAW):
+        return True, ""
+    return False, f"head not turned {asked}"
 
 
 class SessionOrchestrator:
@@ -73,13 +91,15 @@ class SessionOrchestrator:
                 "created_at": datetime.utcnow().isoformat(),
                 "user_id": user_id,
                 "status": "created",
+                "challenge": random.SystemRandom().choice(["left", "right"]),  # server picks, client cannot
+                "challenge_expires_at": (datetime.utcnow() + timedelta(minutes=CHALLENGE_TTL_MINUTES)).isoformat(),
                 "agents": {},
                 "result": None,
             }
             logger.info("Session created: {}", session_id)
             return session_id
 
-    def run_session(self, session_id: str, image_path=None, audio_path=None, behavior_data=None) -> dict:
+    def run_session(self, session_id: str, image_path=None, audio_path=None, behavior_data=None, turn_image_path=None) -> dict:
         """
         Run verification agents based on provided inputs.
 
@@ -88,6 +108,7 @@ class SessionOrchestrator:
             image_path: Path to image file (runs deepfake + liveness)
             audio_path: Path to audio file (runs voice detection)
             behavior_data: dict with keystrokes + mouse_movements
+            turn_image_path: second photo, head turned in the direction the session asked for
 
         Returns:
             Full session result with trust_score, decision, per-agent details
@@ -122,9 +143,14 @@ class SessionOrchestrator:
             try:
                 lv_result = self.liveness_detector.detect_liveness(image_path)
                 lv_score = round(lv_result["liveness_score"] * 100, 1)
+                risk_level = lv_result["risk_level"]
+                # Active challenge: a failed head turn makes liveness CRITICAL (a static photo can't turn)
+                lv_result["head_turn"] = self._check_head_turn(session, image_path, turn_image_path)
+                if not lv_result["head_turn"]["passed"]:
+                    lv_score, risk_level = 0, "CRITICAL"
                 signals["video_agent"] = {
                     "score": lv_score,
-                    "risk_level": lv_result["risk_level"],
+                    "risk_level": risk_level,
                     "details": lv_result,
                 }
             except Exception as e:
@@ -191,6 +217,30 @@ class SessionOrchestrator:
 
         logger.info("Session {}: {} (trust_score={})", session_id, risk_result["decision"], risk_result["trust_score"])
         return session_result
+
+    def _check_head_turn(self, session: dict, front_path, turn_path) -> dict:
+        """Did the user turn their head the way THIS session asked? Fails closed on anything missing."""
+        asked = session["challenge"]
+        result = {"asked": asked, "passed": False, "front_yaw": None, "turn_yaw": None}
+
+        if datetime.utcnow() > datetime.fromisoformat(session["challenge_expires_at"]):
+            result["reason"] = "challenge expired"
+            return result
+        if not turn_path:
+            result["reason"] = "no turned photo"
+            return result
+
+        front_yaw = self.liveness_detector.head_yaw(front_path)
+        turn_yaw = self.liveness_detector.head_yaw(turn_path)
+        result["front_yaw"], result["turn_yaw"] = front_yaw, turn_yaw
+        if front_yaw is None or turn_yaw is None:
+            result["reason"] = "no face in one of the photos"
+            return result
+
+        result["passed"], reason = head_turn_passes(asked, front_yaw, turn_yaw)
+        if reason:
+            result["reason"] = reason
+        return result
 
     def get_session_state(self, session_id: str) -> dict:
         """Get current state of a session."""

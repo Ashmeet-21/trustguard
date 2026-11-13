@@ -22,7 +22,7 @@ import cv2
 import numpy as np
 import onnxruntime as ort
 from PIL import Image
-from typing import Dict, Union
+from typing import Dict, Optional, Union
 from loguru import logger
 
 import mediapipe as mp
@@ -88,6 +88,7 @@ class LivenessDetector:
             "checks": {
                 "face_detected": face_detected,
                 "face_bbox": face_bbox,
+                "head_yaw": self._yaw_from_landmarks(landmarks) if landmarks is not None else None,
                 "model_live_probability": round(float(live_probability), 4),
                 "face_quality_score": round(float(face_quality_score), 4),
                 "texture_score": round(float(texture_score), 4),
@@ -99,6 +100,30 @@ class LivenessDetector:
             "risk_level": self._get_risk_level(liveness_score),
             "classification": "LIVE" if is_live else "SPOOF",
         }
+
+    # ── Head turn (active challenge, R1) ─────────────────────
+
+    def head_yaw(self, image_input) -> Optional[float]:
+        """
+        How far the head is turned, from 3 face-mesh points. No new model, just ratios.
+        Nose tip (1) sits between the two face edges (234 = image-left, 454 = image-right).
+        Facing the camera the nose is in the middle -> 0. Nose towards image-left -> negative,
+        towards image-right -> positive. Returns None if no face is found.
+        """
+        bgr = self._load_image(image_input)
+        results = self.face_mesh.process(cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB))
+        if not results.multi_face_landmarks:
+            return None
+        return self._yaw_from_landmarks(results.multi_face_landmarks[0])
+
+    @staticmethod
+    def _yaw_from_landmarks(landmarks) -> Optional[float]:
+        pts = landmarks.landmark
+        left_edge, right_edge, nose = pts[234].x, pts[454].x, pts[1].x
+        width = right_edge - left_edge
+        if width <= 0:
+            return None
+        return round((nose - left_edge) / width - 0.5, 4)
 
     # ── Pretrained anti-spoof model ─────────────────────────
 

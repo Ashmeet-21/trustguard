@@ -44,6 +44,12 @@ def mock_session_routes():
     routes_session.orchestrator, routes_session.quality_gate_checker, routes_session.audit_reporter = original
 
 
+def _turn_for(session_id):
+    """Pretend the user turned the way this session asked, and return the files to upload."""
+    orch = routes_session.orchestrator
+    orch.liveness_detector.turn_yaw = -0.3 if orch.get_session_state(session_id)["challenge"] == "left" else 0.3
+
+
 def _jpeg_bytes(seed=0):
     rng = np.random.default_rng(seed)
     buf = io.BytesIO()
@@ -82,11 +88,13 @@ def test_replayed_image_fails(client, mock_session_routes):
     image = _jpeg_bytes(seed=42)
 
     first = client.post("/api/v1/session/create").json()["session_id"]
-    r1 = client.post(f"/api/v1/session/{first}/verify", files={"image": ("a.jpg", image, "image/jpeg")})
+    _turn_for(first)
+    r1 = client.post(f"/api/v1/session/{first}/verify", files={"image": ("a.jpg", image, "image/jpeg"), "turn_image": ("t.jpg", image, "image/jpeg")})
     assert r1.json()["decision"] == "PASS"
 
     second = client.post("/api/v1/session/create").json()["session_id"]
-    r2 = client.post(f"/api/v1/session/{second}/verify", files={"image": ("a.jpg", image, "image/jpeg")}).json()
+    _turn_for(second)
+    r2 = client.post(f"/api/v1/session/{second}/verify", files={"image": ("a.jpg", image, "image/jpeg"), "turn_image": ("t.jpg", image, "image/jpeg")}).json()
     assert r2["decision"] == "FAIL"
     assert {"gate": "replay_protection", "passed": False} in r2["quality_gates"]
 
@@ -163,7 +171,9 @@ def test_crashed_agent_blocks_auto_pass(tmp_path):
     orch = _orchestrator(deepfake=BrokenDeepfakeDetector())
     img = tmp_path / "x.jpg"
     img.write_bytes(_jpeg_bytes())
-    result = orch.run_session(orch.create_session(), image_path=str(img), audio_path=str(img))
+    sid = orch.create_session()
+    orch.liveness_detector.turn_yaw = -0.3 if orch.get_session_state(sid)["challenge"] == "left" else 0.3
+    result = orch.run_session(sid, image_path=str(img), audio_path=str(img), turn_image_path=str(img))
     assert result["decision"] == "REVIEW"
 
 

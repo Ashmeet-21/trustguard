@@ -26,6 +26,15 @@ class MockDeepfakeDetector:
 
 
 class MockLivenessDetector:
+    turn_yaw = -0.3  # what the "turned" photo measures; tests change it
+    front_yaw = 0.0  # what the front photo measures
+    _calls = 0
+
+    def head_yaw(self, path):
+        """Called twice per session: front photo first (straight = 0.0), then the turned photo."""
+        self._calls += 1
+        return self.front_yaw if self._calls % 2 == 1 else self.turn_yaw
+
     def detect_liveness(self, path):
         return {
             "is_live": True,
@@ -142,3 +151,59 @@ def test_session_completed_status(orchestrator, test_image_path):
     state = orchestrator.get_session_state(session_id)
     assert state["status"] == "completed"
     assert state["result"] is not None
+
+
+# ── Head-turn challenge (R1) ─────────────────────────────
+
+def _turned_the_right_way(orchestrator, session_id):
+    """Make the mock detector report a turn in the direction this session asked for (left = negative yaw)."""
+    asked = orchestrator.get_session_state(session_id)["challenge"]
+    orchestrator.liveness_detector.turn_yaw = -0.3 if asked == "left" else 0.3
+
+
+def test_server_picks_challenge(orchestrator):
+    assert orchestrator.get_session_state(orchestrator.create_session())["challenge"] in ("left", "right")
+
+
+def test_right_direction_passes(orchestrator, test_image_path):
+    sid = orchestrator.create_session()
+    _turned_the_right_way(orchestrator, sid)
+    result = orchestrator.run_session(sid, image_path=test_image_path, turn_image_path=test_image_path)
+    assert orchestrator.get_session_state(sid)["agents"]["video_agent"]["details"]["head_turn"]["passed"]
+    assert result["agents"]["video_agent"]["risk_level"] == "LOW"
+
+
+def test_wrong_direction_fails(orchestrator, test_image_path):
+    sid = orchestrator.create_session()
+    _turned_the_right_way(orchestrator, sid)
+    orchestrator.liveness_detector.turn_yaw *= -1  # turned the opposite way
+    result = orchestrator.run_session(sid, image_path=test_image_path, turn_image_path=test_image_path)
+    assert result["agents"]["video_agent"]["risk_level"] == "CRITICAL"
+    assert result["decision"] == "FAIL"
+
+
+def test_missing_turn_photo_fails(orchestrator, test_image_path):
+    result = orchestrator.run_session(orchestrator.create_session(), image_path=test_image_path)
+    assert result["agents"]["video_agent"]["risk_level"] == "CRITICAL"
+
+
+def test_expired_challenge_fails(orchestrator, test_image_path):
+    from datetime import datetime, timedelta
+    sid = orchestrator.create_session()
+    _turned_the_right_way(orchestrator, sid)
+    orchestrator.sessions[sid]["challenge_expires_at"] = (datetime.utcnow() - timedelta(seconds=1)).isoformat()
+    result = orchestrator.run_session(sid, image_path=test_image_path, turn_image_path=test_image_path)
+    assert result["agents"]["video_agent"]["risk_level"] == "CRITICAL"
+
+
+def test_turn_is_measured_against_front_photo(orchestrator, test_image_path):
+    """Front photo reads -0.08, turned photo only +0.08: below 0.15 on its own, but a change of +0.16 -> 'right' passes."""
+    sid = orchestrator.create_session()
+    orchestrator.sessions[sid]["challenge"] = "right"
+    orchestrator.liveness_detector._calls = 0
+    orchestrator.liveness_detector.front_yaw, orchestrator.liveness_detector.turn_yaw = -0.08, 0.08
+    try:
+        result = orchestrator.run_session(sid, image_path=test_image_path, turn_image_path=test_image_path)
+    finally:
+        orchestrator.liveness_detector.front_yaw = 0.0
+    assert result["agents"]["video_agent"]["risk_level"] == "LOW"

@@ -113,7 +113,13 @@ Weighted scoring → single liveness score with LIVE/SPOOF classification.
 99.8% of attacks through (CASIA-FASD). The pretrained model scores AUC 0.986 on CASIA's small face crops (6.7% of attacks
 accepted), but on 800 full-size photos from CelebA-Spoof (like a webcam selfie) it scores **AUC 0.80 and accepts 63% of
 attacks** (4.9% of real faces rejected). So it is a weak signal, not a defence on its own: that is why four checks and
-quality gates exist. Next steps: a better model, or an active challenge (blink / head turn).
+quality gates exist.
+
+**Active head-turn challenge.** The server picks left or right at random; the user takes a front photo and a second photo turned towards
+that shoulder. The turn is measured from 3 face-mesh points (no extra model) and compared with the user's own front photo. It needs a live
+head movement, so it stops a single static photo or print. **Limits (measured on a webcam, see `benchmarks/headturn_test.py`):** a phone photo of
+someone whose head was already turned got through in 1 of 9 attack shots; it does not check that the turned face is the same person as the
+front photo; it does not stop a replayed video. Next steps: match the two faces, and use a short burst of frames instead of two photos.
 
 ### 3. Voice Analysis
 - **Primary**: HuggingFace Inference API (`AST-ASVspoof2019` model)

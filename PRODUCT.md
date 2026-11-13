@@ -28,7 +28,7 @@ Problem: voice + typing = 50% of the vote and are unmeasured; the only well-meas
 
 ## 4. Roadmap (ranked, with acceptance criteria)
 
-### R1. Active head-turn challenge (spec ready, not built)
+### R1. Active head-turn challenge (BUILT 2026-11-13, needs real-webcam acceptance tests, see CLAUDE.md)
 - Server picks `left` or `right` when the session is created, stores it with a short expiry (e.g. 2 min). The client cannot choose.
 - Browser sends a front frame + a turned frame in the same verify call (same session).
 - Server computes head yaw from MediaPipe face-mesh landmarks (nose tip vs face edges / ear points). Front frame: yaw near 0. Turned frame: yaw past a threshold in the REQUESTED direction.

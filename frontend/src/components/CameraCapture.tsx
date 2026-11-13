@@ -5,9 +5,11 @@ import { useRef, useState, useCallback, useEffect } from "react";
 interface Props {
   onCapture: (file: File) => void;
   onReset?: () => void;
+  allowUpload?: boolean; // false = camera only (an uploaded file is not mirrored, so a head turn would read backwards)
+  hint?: string;
 }
 
-export default function CameraCapture({ onCapture, onReset }: Props) {
+export default function CameraCapture({ onCapture, onReset, allowUpload = true, hint = "Fit your whole face inside the oval." }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -154,7 +156,7 @@ export default function CameraCapture({ onCapture, onReset }: Props) {
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <button onClick={takeSnapshot} className="btn">Take photo</button>
             <button onClick={stopCamera} className="btn btn-quiet">Cancel</button>
-            <p className="text-sm text-ink-faint">Fit your whole face inside the oval.</p>
+            <p className="text-sm text-ink-faint">{hint}</p>
           </div>
         </div>
       ) : (
@@ -175,10 +177,12 @@ export default function CameraCapture({ onCapture, onReset }: Props) {
             <button onClick={startCamera} disabled={loading} className="btn">
               {loading ? "Opening camera…" : "Open camera"}
             </button>
-            <label className="btn btn-quiet focus-within:outline focus-within:outline-2 focus-within:outline-seal">
-              Upload a photo
-              <input type="file" accept="image/jpeg,image/png" onChange={handleFileUpload} className="sr-only" />
-            </label>
+            {allowUpload && (
+              <label className="btn btn-quiet focus-within:outline focus-within:outline-2 focus-within:outline-seal">
+                Upload a photo
+                <input type="file" accept="image/jpeg,image/png" onChange={handleFileUpload} className="sr-only" />
+              </label>
+            )}
           </div>
         </div>
       )}

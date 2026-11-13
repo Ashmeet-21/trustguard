@@ -66,6 +66,7 @@ export async function createSession(): Promise<{
   session_id: string;
   created_at: string;
   status: string;
+  challenge: "left" | "right"; // which way the server wants the head turned
 }> {
   const res = await fetch(`${API_BASE}/session/create`, {
     method: "POST",
@@ -79,10 +80,12 @@ export async function runVerification(
   sessionId: string,
   image?: File,
   audio?: Blob,
-  behaviorData?: object
+  behaviorData?: object,
+  turnImage?: File
 ): Promise<SessionResult> {
   const formData = new FormData();
   if (image) formData.append("image", image);
+  if (turnImage) formData.append("turn_image", turnImage);
   if (audio) formData.append("audio", audio, "recording.wav");
   if (behaviorData) formData.append("behavior_json", JSON.stringify(behaviorData));
 
@@ -114,6 +117,7 @@ export interface FaceCheckResult {
   faceDetected: boolean;
   livenessScore: number;
   faceBbox: FaceBbox | null;
+  headYaw: number | null; // 0 = facing the camera, negative = towards your left (mirrored view)
 }
 
 export async function checkFace(image: File): Promise<FaceCheckResult> {
@@ -125,13 +129,15 @@ export async function checkFace(image: File): Promise<FaceCheckResult> {
     body: formData,
   });
   if (!res.ok) {
-    return { faceDetected: false, livenessScore: 0, faceBbox: null };
+    if (res.status === 429 || res.status >= 500) throw new Error("check unavailable"); // not the same as "no face"
+    return { faceDetected: false, livenessScore: 0, faceBbox: null, headYaw: null };
   }
   const data = await res.json();
   return {
     faceDetected: data.checks?.face_detected ?? false,
     livenessScore: data.liveness_score ?? 0,
     faceBbox: data.checks?.face_bbox ?? null,
+    headYaw: data.checks?.head_yaw ?? null,
   };
 }
 

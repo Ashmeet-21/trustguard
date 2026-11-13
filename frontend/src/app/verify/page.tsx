@@ -12,6 +12,10 @@ import VerificationDocument from "@/components/VerificationDocument";
 import { createSession, runVerification, checkFace, type SessionResult } from "@/lib/api";
 import type { BehaviorData } from "@/components/BehavioralTracker";
 
+// Head-turn limits: keep equal to FRONT_MAX_YAW / TURN_MIN_YAW in backend/core/session_orchestrator.py
+const FRONT_MAX_YAW = 0.15;
+const TURN_MIN_YAW = 0.10;
+
 /** Plain-English quality gate results */
 function gateInfo(gate: string, passed: boolean): { title: string; description: string } {
   switch (gate) {
@@ -63,6 +67,11 @@ export default function VerifyPage() {
 
   const [currentStep, setCurrentStep] = useState(0);
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [turnFile, setTurnFile] = useState<File | null>(null);
+  const [frontYaw, setFrontYaw] = useState<number | null>(null);
+  const [turnChecking, setTurnChecking] = useState(false);
+  const [turnError, setTurnError] = useState<string | null>(null);
+  const [session, setSession] = useState<{ id: string; challenge: "left" | "right" } | null>(null);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [behaviorData, setBehaviorData] = useState<BehaviorData | null>(null);
@@ -86,6 +95,14 @@ export default function VerifyPage() {
     return () => URL.revokeObjectURL(url);
   }, [imageFile]);
 
+  // Once the front photo is good, ask the server for a head-turn challenge (the server picks left/right)
+  useEffect(() => {
+    if (!faceValid || session) return;
+    createSession()
+      .then((s) => setSession({ id: s.session_id, challenge: s.challenge }))
+      .catch(() => setError("Could not start the verification. Please try again."));
+  }, [faceValid, session]);
+
   if (authLoading || !user) {
     return (
       <div className="max-w-6xl mx-auto px-6 py-24 flex items-center gap-3 text-ink-soft">
@@ -103,6 +120,7 @@ export default function VerifyPage() {
 
     try {
       const check = await checkFace(file);
+      setFrontYaw(check.headYaw);
       if (!check.faceDetected) {
         setFaceError("No face found. Take a clear selfie with your whole face inside the oval.");
         setImageFile(null);
@@ -140,8 +158,34 @@ export default function VerifyPage() {
     }
   };
 
+  // Same rule as the server (session_orchestrator.py), so people can retake BEFORE the one-shot verification
+  const handleTurnCapture = async (file: File) => {
+    setTurnFile(null);
+    setTurnError(null);
+    setTurnChecking(true);
+    try {
+      const check = await checkFace(file);
+      if (!session || !check.faceDetected || check.headYaw === null) {
+        setTurnError("No face found in the second photo. Keep your face in view and try again.");
+      } else if (frontYaw === null || Math.abs(frontYaw) > FRONT_MAX_YAW) {
+        setTurnError("Your first photo was not straight. Take a different first photo, looking at the camera.");
+      } else {
+        const change = check.headYaw - frontYaw;
+        const turnedEnough = session.challenge === "left" ? change <= -TURN_MIN_YAW : change >= TURN_MIN_YAW;
+        if (turnedEnough) setTurnFile(file);
+        else setTurnError(`Turn a bit more towards your ${session.challenge} shoulder, then take the photo again.`);
+      }
+    } catch {
+      setTurnError("Couldn’t check the photo right now. Wait a few seconds and take it again.");
+    } finally {
+      setTurnChecking(false);
+    }
+  };
+
   const handleImageReset = () => {
     setImageFile(null);
+    setTurnFile(null);
+    setTurnError(null);
     setFaceValid(false);
     setFaceError(null);
   };
@@ -154,8 +198,8 @@ export default function VerifyPage() {
     setProcessing(true);
     setError(null);
     try {
-      const session = await createSession();
-      const res = await runVerification(session.session_id, imageFile || undefined, audioBlob || undefined, behaviorData || undefined);
+      if (!session) throw new Error("No active session. Please start again.");
+      const res = await runVerification(session.id, imageFile || undefined, audioBlob || undefined, behaviorData || undefined, turnFile || undefined);
       setResult(res);
       setCurrentStep(4);
     } catch (err) {
@@ -169,6 +213,10 @@ export default function VerifyPage() {
   const restart = () => {
     setCurrentStep(0);
     setImageFile(null);
+    setTurnFile(null);
+    setTurnError(null);
+    setFrontYaw(null);
+    setSession(null);
     setAudioBlob(null);
     setBehaviorData(null);
     setResult(null);
@@ -212,8 +260,8 @@ export default function VerifyPage() {
 
           {currentStep === 0 && (
             <section className="sheet p-6 sm:p-8">
-              {stepHeading("Take a selfie", "Use your camera or upload a photo. It’s checked for signs of AI generation and for a live person.")}
-              <CameraCapture onCapture={handleImageCapture} onReset={handleImageReset} />
+              {stepHeading("Take a selfie", "Use your camera. It’s checked for signs of AI generation and for a live person.")}
+              <CameraCapture onCapture={handleImageCapture} onReset={handleImageReset} allowUpload={false} />
 
               <div className="mt-4" aria-live="polite">
                 {faceChecking && (
@@ -227,7 +275,29 @@ export default function VerifyPage() {
                 {faceError && <p className="note note-fail"><span>{faceError}</span></p>}
               </div>
 
-              {navButtons(nextStep, "Continue to voice", !imageFile || !faceValid || faceChecking, false)}
+              {faceValid && session && (
+                <div className="mt-6 pt-6 border-t border-rule">
+                  <h3 className="font-semibold text-ink">Now turn your head</h3>
+                  <p className="mt-1 mb-4 text-ink-soft max-w-[60ch]">
+                    Take a second photo while you turn your head towards your <strong>{session.challenge} shoulder</strong>. Keep your face in view.
+                  </p>
+                  <CameraCapture
+                    allowUpload={false}
+                    hint={`Turn towards your ${session.challenge} shoulder, then take the photo.`}
+                    onCapture={handleTurnCapture}
+                    onReset={() => { setTurnFile(null); setTurnError(null); }}
+                  />
+                  <div className="mt-4" aria-live="polite">
+                    {turnChecking && (
+                      <p className="flex items-center gap-2.5 text-ink-soft"><span className="spinner w-4 h-4" /> Checking your head turn…</p>
+                    )}
+                    {turnFile && !turnChecking && <p className="note note-pass"><span>Head turn looks good. You can continue.</span></p>}
+                    {turnError && <p className="note note-fail"><span>{turnError}</span></p>}
+                  </div>
+                </div>
+              )}
+
+              {navButtons(nextStep, "Continue to voice", !imageFile || !faceValid || faceChecking || !turnFile || turnChecking, false)}
             </section>
           )}
 

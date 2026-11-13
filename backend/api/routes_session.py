@@ -40,6 +40,7 @@ async def create_session(request: Request, current_user: User | None = Depends(g
         "session_id": session_id,
         "created_at": state["created_at"],
         "status": state["status"],
+        "challenge": state["challenge"],
         "user_id": current_user.id if current_user else None,
     }
 
@@ -50,6 +51,7 @@ async def run_verification(
     request: Request,
     session_id: str,
     image: UploadFile = File(None),
+    turn_image: UploadFile = File(None),
     audio: UploadFile = File(None),
     behavior_json: str = Form(None),
     current_user: User | None = Depends(get_optional_user),
@@ -60,6 +62,7 @@ async def run_verification(
 
     Accepts multipart form with:
     - image: selfie/photo (runs deepfake + liveness)
+    - turn_image: second photo with the head turned the way the session asked (challenge)
     - audio: voice sample (runs voice detection)
     - behavior_json: JSON string with keystroke + mouse data
     """
@@ -79,12 +82,15 @@ async def run_verification(
         raise HTTPException(status_code=400, detail="At least one input required (image, audio, or behavior data)")
     if image:
         validate_image(image)
+    if turn_image:
+        validate_image(turn_image)
     if audio:
         validate_audio(audio)
 
     # Same safe upload helper as every other endpoint (size limit + content check + cleanup)
     async with AsyncExitStack() as stack:
         image_path = str(await stack.enter_async_context(save_temp_file(image, "image"))) if image else None
+        turn_path = str(await stack.enter_async_context(save_temp_file(turn_image, "image"))) if turn_image else None
         audio_path = str(await stack.enter_async_context(save_temp_file(audio, "audio"))) if audio else None
 
         try:
@@ -92,6 +98,7 @@ async def run_verification(
                 session_id=session_id,
                 image_path=image_path,
                 audio_path=audio_path,
+                turn_image_path=turn_path,
                 behavior_data=behavior_data,
             )
             if "error" in result:

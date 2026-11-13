@@ -21,9 +21,9 @@ const CHECKS = [
   },
   {
     name: "A live person",
-    how: "A small pretrained anti-spoofing model looks at the face and its surroundings",
-    catches: "Some printed photos and screen replays. It stopped 93% of attacks on small face crops (CASIA) but only 37% on full-size photos (CelebA-Spoof). Treat it as one weak signal",
-    misses: "Most phone-screen replays in normal photos, high-quality masks",
+    how: "A small pretrained anti-spoofing model looks at the face, and you turn your head towards a shoulder the server picks at random",
+    catches: "Some printed photos and screen replays. It stopped 93% of attacks on small face crops (CASIA) but only 37% on full-size photos (CelebA-Spoof). Treat the model as one weak signal. The head turn needs a live head movement, so it stops a single static photo or print",
+    misses: "A photo of someone whose head is already turned, a replayed video, high-quality masks. It does not check that the turned face is the same person",
     weight: 10,
   },
   {
