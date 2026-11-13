@@ -99,9 +99,9 @@ function Guilloche() {
 function PortraitPlaceholder() {
   return (
     <svg viewBox="0 0 90 110" className="w-full h-full" aria-hidden="true">
-      <rect width="90" height="110" fill="#e4e9e6" />
-      <circle cx="45" cy="42" r="17" fill="#c3ccc8" />
-      <path d="M12 110c2-24 16-36 33-36s31 12 33 36z" fill="#c3ccc8" />
+      <rect width="90" height="110" className="fill-photo" />
+      <circle cx="45" cy="42" r="17" className="fill-silhouette" />
+      <path d="M12 110c2-24 16-36 33-36s31 12 33 36z" className="fill-silhouette" />
     </svg>
   );
 }
@@ -115,7 +115,7 @@ export default function VerificationDocument(props: Props) {
   return (
     <article className="sheet relative overflow-hidden" aria-label="Verification record">
       {/* Header band with guilloche */}
-      <div className="relative border-b border-rule px-5 sm:px-6 py-3 flex items-center justify-between gap-4 bg-[#f1f4f2]">
+      <div className="relative border-b border-rule px-5 sm:px-6 py-3 flex items-center justify-between gap-4 bg-strip">
         <Guilloche />
         <p className="relative font-semibold text-ink">Verification record</p>
         <p className="relative text-sm text-ink-soft figures">
@@ -125,7 +125,7 @@ export default function VerificationDocument(props: Props) {
 
       {/* Identity block */}
       <div className="px-5 sm:px-6 pt-5 pb-4 grid grid-cols-[5.5rem_1fr] sm:grid-cols-[6.5rem_1fr_auto] gap-x-5 gap-y-4 items-start">
-        <div className="aspect-[9/11] rounded-[3px] overflow-hidden border border-rule bg-[#e4e9e6] row-span-2 sm:row-span-1">
+        <div className="aspect-[9/11] rounded-[3px] overflow-hidden border border-rule bg-photo row-span-2 sm:row-span-1">
           {photoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={photoUrl} alt="Submitted selfie" className="w-full h-full object-cover" />
@@ -157,7 +157,7 @@ export default function VerificationDocument(props: Props) {
           className="stamp col-span-2 sm:col-span-1 justify-self-start sm:justify-self-end self-center px-4 py-2 rounded-[3px] text-center -rotate-2"
           style={{ "--stamp": style.color } as React.CSSProperties}
         >
-          <p className="text-2xl font-bold leading-none tracking-wide">{style.word}</p>
+          <p className="text-2xl font-bold leading-none">{style.word}</p>
           <p className="text-xs mt-1 font-medium">{style.meaning}</p>
         </div>
       </div>
@@ -202,7 +202,7 @@ export default function VerificationDocument(props: Props) {
       </table>
 
       {/* Machine-readable zone */}
-      <div className="border-t border-rule bg-[#f1f4f2] px-5 sm:px-6 py-3">
+      <div className="border-t border-rule bg-strip px-5 sm:px-6 py-3">
         <p className={`mrz ${animate ? "mrz-print" : ""}`} aria-label="Machine-readable summary">
           <span>{mrz1}</span>
           {"\n"}

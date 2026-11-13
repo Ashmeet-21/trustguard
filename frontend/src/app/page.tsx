@@ -71,7 +71,7 @@ export default function Home() {
       {/* Hero */}
       <section className="max-w-6xl mx-auto px-6 pt-14 pb-20 md:pt-20 grid lg:grid-cols-[1fr_minmax(0,34rem)] gap-12 lg:gap-16 items-center">
         <div className="max-w-xl">
-          <h1 className="text-[2.5rem] md:text-[3.25rem] leading-[1.05] font-bold tracking-[-0.02em] text-ink">
+          <h1 className="display-title">
             Check that a person is real before you let them in.
           </h1>
           <p className="mt-6 text-lg text-ink-soft leading-relaxed">

@@ -22,6 +22,9 @@
   --color-fail: #a61e3a;
   --color-fail-tint: #f6e1e5;
   --color-guilloche: #8fa9a3;
+  --color-strip: #f1f4f2;       /* header / footer strip of the document */
+  --color-photo: #e4e9e6;       /* empty photo background */
+  --color-silhouette: #c3ccc8;  /* empty photo figure */
 
   --text-small: 0.9375rem;      /* body-small: tables, nav, card text */
 
@@ -59,6 +62,13 @@ body {
   letter-spacing: -0.02em;
   color: var(--color-ink);
 }
+.display-title {
+  font-size: 2.5rem;
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  color: var(--color-ink);
+}
 .section-title {
   font-size: 1.75rem;
   font-weight: 700;
@@ -68,6 +78,7 @@ body {
 @media (min-width: 48rem) {
   .page-title { font-size: 2.5rem; }
   .section-title { font-size: 2rem; }
+  .display-title { font-size: 3.25rem; }
 }
 
 /* Decision stamp: colour comes from the --stamp variable set on the element */

@@ -3,6 +3,7 @@ import { Schibsted_Grotesk, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
 import Providers from "@/lib/Providers";
+import ServerWakeNotice from "@/components/ServerWakeNotice";
 
 const schibsted = Schibsted_Grotesk({
   variable: "--font-schibsted",
@@ -54,6 +55,7 @@ export default function RootLayout({
       <body className={`${schibsted.variable} ${plexMono.variable} antialiased min-h-screen flex flex-col`}>
         <Providers>
           <Navbar />
+          <ServerWakeNotice />
           <main className="flex-1">{children}</main>
           <footer className="border-t border-rule mt-8">
             <div className="max-w-6xl mx-auto px-6 py-8 flex flex-col sm:flex-row gap-3 sm:items-center justify-between text-sm text-ink-faint">

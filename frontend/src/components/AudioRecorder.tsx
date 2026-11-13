@@ -114,12 +114,26 @@ function wordMatch(spoken: string, target: string): number {
   return Math.round((matched / targetWords.length) * 100);
 }
 
+// The Web Speech API is not in TypeScript's built-in types, so we describe
+// only the small part we use.
+type SpeechRecognitionLike = {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
+  onerror: (() => void) | null;
+  start(): void;
+  stop(): void;
+};
+type SpeechRecognitionCtor = new () => SpeechRecognitionLike;
+
 // Check for Web Speech API (Chrome/Edge)
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function getSpeechRecognition(): any {
+function getSpeechRecognition(): SpeechRecognitionCtor | null {
   if (typeof window === "undefined") return null;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const w = window as any;
+  const w = window as unknown as {
+    SpeechRecognition?: SpeechRecognitionCtor;
+    webkitSpeechRecognition?: SpeechRecognitionCtor;
+  };
   return w.SpeechRecognition || w.webkitSpeechRecognition || null;
 }
 
@@ -129,8 +143,7 @@ export default function AudioRecorder({ onRecording, onReset }: Props) {
   const processorRef = useRef<ScriptProcessorNode | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Float32Array[]>([]);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const recognitionRef = useRef<any>(null);
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const transcriptRef = useRef<string>("");
   const speechAvailableRef = useRef(false);
 
@@ -182,8 +195,7 @@ export default function AudioRecorder({ onRecording, onReset }: Props) {
           recognition.lang = "en-US";
           transcriptRef.current = "";
 
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          recognition.onresult = (event: any) => {
+          recognition.onresult = (event) => {
             let text = "";
             for (let i = 0; i < event.results.length; i++) {
               text += event.results[i][0].transcript;

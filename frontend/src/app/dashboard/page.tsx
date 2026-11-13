@@ -143,7 +143,7 @@ export default function DashboardPage() {
                 className={`py-5 pr-4 ${i % 2 === 1 ? "pl-5 border-l border-rule" : ""} ${i === 2 ? "lg:pl-5 lg:border-l border-t lg:border-t-0 border-rule" : ""} ${i === 3 ? "border-t lg:border-t-0" : ""}`}
               >
                 <dt className="text-sm text-ink-soft">{s.label}</dt>
-                <dd className="mt-1 text-[1.75rem] font-bold leading-tight text-ink figures">{s.value}</dd>
+                <dd className="mt-1 text-3xl font-bold leading-tight text-ink figures">{s.value}</dd>
                 {s.sub && <dd className="text-sm text-ink-faint figures">{s.sub}</dd>}
               </div>
             ))}

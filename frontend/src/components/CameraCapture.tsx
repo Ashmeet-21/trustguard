@@ -148,7 +148,7 @@ export default function CameraCapture({ onCapture, onReset }: Props) {
                 </mask>
               </defs>
               <rect width="640" height="480" fill="rgba(22,35,58,0.45)" mask="url(#faceOvalMask)" />
-              <ellipse cx="320" cy="225" rx="140" ry="180" fill="none" stroke="#f9faf8" strokeWidth="2" />
+              <ellipse cx="320" cy="225" rx="140" ry="180" fill="none" className="stroke-sheet" strokeWidth="2" />
             </svg>
           </div>
           <div className="mt-4 flex flex-wrap items-center gap-3">

@@ -9,6 +9,8 @@ const nextConfig: NextConfig = {
         source: "/api/:path*",
         destination: `${backendUrl}/api/:path*`,
       },
+      // Used by ServerWakeNotice to wake the free-tier backend
+      { source: "/health", destination: `${backendUrl}/health` },
     ];
   },
 };

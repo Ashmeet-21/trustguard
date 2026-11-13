@@ -287,7 +287,7 @@ export default function VerifyPage() {
                         return (
                           <li key={gate.gate} className="py-3 flex gap-3">
                             <span
-                              className={`mt-1 shrink-0 w-4 h-4 rounded-full flex items-center justify-center text-white text-[0.625rem] font-bold ${gate.passed ? "bg-pass" : "bg-fail"}`}
+                              className={`mt-1 shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-white text-xs font-bold ${gate.passed ? "bg-pass" : "bg-fail"}`}
                               aria-hidden="true"
                             >
                               {gate.passed ? "✓" : "!"}
