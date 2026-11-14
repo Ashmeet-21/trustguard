@@ -6,6 +6,12 @@ function getAuthHeaders(): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+/** Read the server's error text: FastAPI sends a string, or a list of {msg} for 422s. */
+async function errorMessage(res: Response, fallback: string): Promise<string> {
+  const err = await res.json().catch(() => ({ detail: fallback }));
+  return typeof err.detail === "string" ? err.detail : Array.isArray(err.detail) ? err.detail.map((e: { msg?: string }) => e.msg).join(", ") : fallback;
+}
+
 // ─── Auth ───────────────────────────────────────────────────────────
 
 export async function loginUser(
@@ -22,9 +28,7 @@ export async function loginUser(
     body,
   });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: "Login failed" }));
-    const msg = typeof err.detail === "string" ? err.detail : Array.isArray(err.detail) ? err.detail.map((e: { msg?: string }) => e.msg).join(", ") : "Login failed";
-    throw new Error(msg);
+    throw new Error(await errorMessage(res, "Login failed"));
   }
   return res.json();
 }
@@ -40,9 +44,7 @@ export async function registerUser(
     body: JSON.stringify({ email, password, full_name }),
   });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: "Registration failed" }));
-    const msg = typeof err.detail === "string" ? err.detail : Array.isArray(err.detail) ? err.detail.map((e: { msg?: string }) => e.msg).join(", ") : "Registration failed";
-    throw new Error(msg);
+    throw new Error(await errorMessage(res, "Registration failed"));
   }
   return res.json();
 }
@@ -95,9 +97,7 @@ export async function runVerification(
     body: formData,
   });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: "Verification failed" }));
-    const msg = typeof err.detail === "string" ? err.detail : Array.isArray(err.detail) ? err.detail.map((e: { msg?: string }) => e.msg).join(", ") : "Verification failed";
-    throw new Error(msg);
+    throw new Error(await errorMessage(res, "Verification failed"));
   }
   return res.json();
 }
