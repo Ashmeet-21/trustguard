@@ -100,10 +100,11 @@ class VoiceDetector:
         """
         Local fallback — spectral analysis using scipy.
 
-        Three checks:
+        Four checks (weights 30/20/20/30):
         1. Spectral flatness — synthetic audio is "flatter" (more uniform frequencies)
         2. Zero-crossing rate — how often signal crosses zero
         3. Energy variation — human speech has more dynamic range
+        4. Pitch variation — human speech changes pitch, synthetic is often monotone
         """
         try:
             import scipy.io.wavfile as wavfile

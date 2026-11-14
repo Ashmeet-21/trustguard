@@ -57,6 +57,27 @@ async def detect_liveness_image(
     return result
 
 
+def _read_sample_frames(video_path: str, sample_frames: int) -> list:
+    """Read up to `sample_frames` frames spread evenly through the video. Bad video -> 400."""
+    cap = cv2.VideoCapture(video_path)
+    try:
+        if not cap.isOpened():
+            raise HTTPException(status_code=400, detail="Could not open video file")
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        if total_frames == 0:
+            raise HTTPException(status_code=400, detail="Video has no frames")
+
+        frames = []
+        for idx in np.linspace(0, total_frames - 1, min(sample_frames, total_frames), dtype=int):
+            cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
+            ok, frame = cap.read()
+            if ok:
+                frames.append(frame)
+        return frames
+    finally:
+        cap.release()  # always close the video file, even on an error
+
+
 @router.post("/liveness/video")
 @limiter.limit("5/minute")
 async def detect_liveness_video(
@@ -75,27 +96,8 @@ async def detect_liveness_video(
     async with save_temp_file(file, "video") as temp_path:
         start = time.time()
 
-        cap = cv2.VideoCapture(str(temp_path))
-        if not cap.isOpened():
-            raise HTTPException(status_code=400, detail="Could not open video file")
-
-        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        if total_frames == 0:
-            cap.release()
-            raise HTTPException(status_code=400, detail="Video has no frames")
-
-        frame_indices = np.linspace(0, total_frames - 1, min(sample_frames, total_frames), dtype=int)
-
-        frame_results = []
-        for idx in frame_indices:
-            cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
-            ret, frame = cap.read()
-            if not ret:
-                continue
-            result = detector.detect_liveness(frame)
-            frame_results.append(result)
-
-        cap.release()
+        frames = _read_sample_frames(str(temp_path), sample_frames)
+        frame_results = [detector.detect_liveness(frame) for frame in frames]
 
         # Majority vote
         live_count = sum(1 for r in frame_results if r["is_live"])
