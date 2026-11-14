@@ -76,7 +76,7 @@ async def verify_kyc(
     if is_deepfake or liveness_score < 0.4:
         verdict = "FAIL"
         reason = "Deepfake detected" if is_deepfake else "Low liveness score"
-    elif not is_deepfake and liveness_score >= 0.7:
+    elif liveness_score >= 0.7:  # (is_deepfake is already False here)
         verdict = "PASS"
         reason = "Image appears authentic and live"
     else:

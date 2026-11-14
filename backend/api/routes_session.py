@@ -45,6 +45,23 @@ async def create_session(request: Request, current_user: User | None = Depends(g
     }
 
 
+def _parse_behavior(behavior_json):
+    """Turn the behavior_json form field into a checked dict (None if not sent). Bad input -> 400."""
+    if not behavior_json:
+        return None
+    try:
+        return BehaviorRequest(**json.loads(behavior_json)).model_dump()
+    except (ValueError, TypeError):  # bad JSON or failed schema validation
+        raise HTTPException(status_code=400, detail="Invalid behavior_json format")
+
+
+async def _save_optional(stack, upload, kind):
+    """Save one optional upload with save_temp_file; returns its path, or None if it wasn't sent."""
+    if not upload:
+        return None
+    return str(await stack.enter_async_context(save_temp_file(upload, kind)))
+
+
 @router.post("/{session_id}/verify")
 @limiter.limit("5/minute")
 async def run_verification(
@@ -71,12 +88,7 @@ async def run_verification(
 
     _get_owned_session(session_id, current_user)
 
-    behavior_data = None
-    if behavior_json:
-        try:
-            behavior_data = BehaviorRequest(**json.loads(behavior_json)).model_dump()
-        except (ValueError, TypeError):  # bad JSON or failed schema validation
-            raise HTTPException(status_code=400, detail="Invalid behavior_json format")
+    behavior_data = _parse_behavior(behavior_json)
 
     if not image and not audio and not behavior_data:
         raise HTTPException(status_code=400, detail="At least one input required (image, audio, or behavior data)")
@@ -87,11 +99,11 @@ async def run_verification(
     if audio:
         validate_audio(audio)
 
-    # Same safe upload helper as every other endpoint (size limit + content check + cleanup)
+    # Save the uploads (size limit + content check). The stack deletes them all when the block ends.
     async with AsyncExitStack() as stack:
-        image_path = str(await stack.enter_async_context(save_temp_file(image, "image"))) if image else None
-        turn_path = str(await stack.enter_async_context(save_temp_file(turn_image, "image"))) if turn_image else None
-        audio_path = str(await stack.enter_async_context(save_temp_file(audio, "audio"))) if audio else None
+        image_path = await _save_optional(stack, image, "image")
+        turn_path = await _save_optional(stack, turn_image, "image")
+        audio_path = await _save_optional(stack, audio, "audio")
 
         try:
             result = orchestrator.run_session(
