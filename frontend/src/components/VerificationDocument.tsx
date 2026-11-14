@@ -24,6 +24,8 @@ interface Props {
   animate?: boolean;    // print the MRZ in (results screen only)
 }
 
+const CHECK_KEYS = ["image_agent", "video_agent", "voice_agent", "behavior_agent"];
+
 const CHECK_INFO: Record<string, { label: string; code: string }> = {
   image_agent: { label: "Face is not AI-generated", code: "IMG" },
   video_agent: { label: "A live person, not a photo of one", code: "LIV" },
@@ -60,7 +62,7 @@ export function buildMrz(p: Pick<Props, "decision" | "trustScore" | "checks" | "
   const score = String(Math.round(p.trustScore)).padStart(3, "0");
   const line1 = mrzLine(`TGV<${p.decision}<<SCORE<${score}<<${p.holder || "ANONYMOUS"}`);
 
-  const readings = ["image_agent", "video_agent", "voice_agent", "behavior_agent"].map((key) => {
+  const readings = CHECK_KEYS.map((key) => {
     const c = p.checks.find((x) => x.key === key);
     const value = c && c.score !== null ? String(Math.round(c.score)).padStart(3, "0") : "<<<";
     return CHECK_INFO[key].code + value;
@@ -173,23 +175,24 @@ export default function VerificationDocument(props: Props) {
           </tr>
         </thead>
         <tbody>
-          {["image_agent", "video_agent", "voice_agent", "behavior_agent"].map((key) => {
+          {CHECK_KEYS.map((key) => {
             const c = checks.find((x) => x.key === key);
-            const ran = c && c.score !== null;
+            const score = c && c.score !== null ? c.score : null; // null = not run
+            const risk = c?.risk || "";
             return (
               <tr key={key} className="border-t border-rule/70">
                 <td className="px-5 sm:px-6 py-2.5 text-ink">{CHECK_INFO[key].label}</td>
-                <td className="py-2.5 text-right font-semibold figures">{ran ? Math.round(c!.score!) : "—"}</td>
+                <td className="py-2.5 text-right font-semibold figures">{score !== null ? Math.round(score) : "—"}</td>
                 <td className="py-2.5 pl-5 pr-5 sm:pr-6">
-                  {ran ? (
+                  {score !== null ? (
                     <span className="flex items-center gap-2">
                       <span className="hidden sm:block flex-1 h-1.5 bg-rule/60 rounded-full overflow-hidden">
                         <span
                           className="block h-full rounded-full"
-                          style={{ width: `${Math.max(3, c!.score!)}%`, background: RISK_COLOR[c!.risk || ""] || "var(--color-ink-soft)" }}
+                          style={{ width: `${Math.max(3, score)}%`, background: RISK_COLOR[risk] || "var(--color-ink-soft)" }}
                         />
                       </span>
-                      <span style={{ color: RISK_COLOR[c!.risk || ""] }}>{RISK_WORD[c!.risk || ""] || c!.risk}</span>
+                      <span style={{ color: RISK_COLOR[risk] }}>{RISK_WORD[risk] || risk}</span>
                     </span>
                   ) : (
                     <span className="text-ink-faint">Not run</span>
