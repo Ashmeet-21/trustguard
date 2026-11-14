@@ -43,6 +43,8 @@ docker-compose up --build                       # both services
   - `audit_reporter.py` — JSON reports in `backend/audit_reports/` + DB AuditLog. Reports store `user_id`; only the owner can read them. `get_report` only accepts UUIDs (path traversal guard).
   - `hf_gateway.py` — HF InferenceClient wrapper; one `_call_with_retries` used by image + audio. Defines `DetectorUnavailable`.
 - `api/` — `routes_*.py` (deepfake, liveness, voice, behavior, session, audit, kyc, auth, user, analytics, general) + `schemas.py` (only request models + auth/history responses; password rules enforced in schema → 422; behavior lists capped 2000/5000).
+- `static/landing.html` — HTML for `GET /` (read once by `api/routes_general.py`).
+- Branch `simplify-for-interview` (2026-11-13, not pushed): interview-simplicity refactor, same behaviour (golden old-vs-new checks + 112 tests).
 - `utils/file_handling.py` — `save_temp_file(file, kind)` is the ONLY way to save uploads: UUID name, size limit, magic-byte content check (`kind` = image/video/audio). Use it for every new upload endpoint.
 - `database/` — SQLAlchemy + SQLite. Models: User, VerificationLog, AuditLog.
 - `utils/` — `config.py` (all env vars), `file_handling.py`, `rate_limiter.py` (slowapi), `logging.py` (loguru).
