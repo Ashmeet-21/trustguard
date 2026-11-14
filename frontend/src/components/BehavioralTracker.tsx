@@ -48,14 +48,13 @@ export default function BehavioralTracker({ onComplete, onReset }: Props) {
   const [phraseIndex, setPhraseIndex] = useState(() => pickRandom());
   const [typedText, setTypedText] = useState("");
   const [completed, setCompleted] = useState(false);
-  const [accuracy, setAccuracy] = useState(0);
   const [mismatchError, setMismatchError] = useState(false);
   const keystrokesRef = useRef<{ key: string; timestamp_ms: number }[]>([]);
   const mouseRef = useRef<{ x: number; y: number; timestamp_ms: number }[]>([]);
   const startTimeRef = useRef(Date.now());
-  const containerRef = useRef<HTMLDivElement>(null);
 
   const targetPhrase = TARGET_PHRASES[phraseIndex];
+  const accuracy = calcAccuracy(typedText, targetPhrase);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     keystrokesRef.current.push({
@@ -82,7 +81,6 @@ export default function BehavioralTracker({ onComplete, onReset }: Props) {
     setMismatchError(false);
 
     const acc = calcAccuracy(val, targetPhrase);
-    setAccuracy(acc);
 
     // Check completion: must reach target length AND accuracy >= threshold
     if (val.length >= targetPhrase.length) {
@@ -102,7 +100,6 @@ export default function BehavioralTracker({ onComplete, onReset }: Props) {
   const resetTracker = useCallback(() => {
     setTypedText("");
     setCompleted(false);
-    setAccuracy(0);
     setMismatchError(false);
     keystrokesRef.current = [];
     mouseRef.current = [];
@@ -132,7 +129,7 @@ export default function BehavioralTracker({ onComplete, onReset }: Props) {
   };
 
   return (
-    <div ref={containerRef} onMouseMove={handleMouseMove} className="space-y-5">
+    <div onMouseMove={handleMouseMove} className="space-y-5">
       <blockquote className="border-l-[3px] border-seal bg-seal-tint/50 px-5 py-4 rounded-r-[4px]">
         <p className="text-xl leading-snug font-medium" aria-label={targetPhrase}>
           {typedText.length > 0 ? renderColoredTarget() : <span className="text-ink">{targetPhrase}</span>}
