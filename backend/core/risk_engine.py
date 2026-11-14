@@ -1,23 +1,23 @@
 """
-Risk Scoring Engine — The "brain" that combines all agent results into one decision.
+Risk Scoring Engine - combines all agent results into one decision.
 
 Takes scores from up to 4 detection agents (deepfake, liveness, voice, behavior)
 and produces a single trust_score (0-100) with a PASS/REVIEW/FAIL decision.
 
-Weighted scoring:
-- Image agent (deepfake): 30% weight
-- Video agent (liveness): 25% weight
-- Voice agent: 25% weight
-- Behavior agent: 20% weight
+Weighted scoring (weights are re-scaled so the agents that ran add up to 100%):
+- Image agent (deepfake): 40%
+- Video agent (liveness): 10%
+- Voice agent: 25%
+- Behavior agent: 25%
 
-Decision rules:
+Decision rules ("flagged" = agent risk_level is HIGH or CRITICAL):
 - FAIL: trust_score < 40 OR any agent CRITICAL OR 2+ agents flagged
-- REVIEW: trust_score 40-69 OR 1 agent flagged HIGH
-- PASS: trust_score >= 70 AND no CRITICAL/HIGH agents
+- REVIEW: trust_score < 70 OR 1 agent flagged
+- PASS: everything else
 
-INTERVIEW TIP: "The risk engine uses weighted scoring like a school grade.
-Each agent is a subject — deepfake detection counts for 30%, liveness 25%, etc.
-Then simple decision rules determine the final verdict."
+INTERVIEW TIP: "The risk engine works like a school grade.
+Each agent is a subject with a weight, the weighted average is the score,
+and a few simple rules turn the score into PASS / REVIEW / FAIL."
 """
 
 from loguru import logger
@@ -48,22 +48,14 @@ class RiskEngine:
         Returns:
             dict with trust_score, decision, explanation, per-agent breakdown
         """
-        if not signals:
-            return {
-                "trust_score": 0,
-                "decision": "FAIL",
-                "explanation": ["No detection signals provided"],
-                "agents": {},
-                "overall_risk": "CRITICAL",
-            }
-
-        # Adjust weights for available signals only
-        available = {k: v for k, v in self.WEIGHTS.items() if k in signals}
+        # Keep only the agents we know about, then re-scale their weights to add up to 1
+        available = {k: v for k, v in self.WEIGHTS.items() if k in (signals or {})}
         if not available:
+            reason = "No recognized agent signals" if signals else "No detection signals provided"
             return {
                 "trust_score": 0,
                 "decision": "FAIL",
-                "explanation": ["No recognized agent signals"],
+                "explanation": [reason],
                 "agents": {},
                 "overall_risk": "CRITICAL",
             }
@@ -71,7 +63,8 @@ class RiskEngine:
         total_weight = sum(available.values())
         normalized_weights = {k: v / total_weight for k, v in available.items()}
 
-        # Calculate weighted trust score (0-100)
+        # Weighted trust score (0-100). Note: "FLAGGED" in the explanation text uses score < 60,
+        # while the decision rules below count risk_level HIGH/CRITICAL.
         trust_score = 0
         explanation = []
         flagged_agents = 0
