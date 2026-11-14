@@ -78,14 +78,8 @@ class BehaviorAnalyzer:
         # Weighted average (only count checks that had data)
         if available_weights:
             total_weight = sum(available_weights.values())
-            score_keys = {
-                "typing_speed": "typing_speed_score",
-                "typing_rhythm": "typing_rhythm_score",
-                "mouse_speed": "mouse_speed_score",
-                "mouse_straightness": "mouse_straightness_score",
-            }
             behavior_score = sum(
-                (available_weights[k] / total_weight) * checks[score_keys[k]]
+                (available_weights[k] / total_weight) * checks[k + "_score"]  # e.g. "mouse_speed_score"
                 for k in available_weights
             )
         else:
@@ -208,15 +202,12 @@ class BehaviorAnalyzer:
         if len(movements) < 3:
             return 0.5
 
-        # Calculate actual path length
+        # Length of the path the mouse actually took (sum of each small step)
         actual_length = 0
-        segment_lengths = []
         for i in range(1, len(movements)):
             dx = movements[i]["x"] - movements[i - 1]["x"]
             dy = movements[i]["y"] - movements[i - 1]["y"]
-            seg = np.sqrt(dx ** 2 + dy ** 2)
-            actual_length += seg
-            segment_lengths.append(seg)
+            actual_length += np.sqrt(dx ** 2 + dy ** 2)
 
         # Straight-line distance (start to end)
         dx_total = movements[-1]["x"] - movements[0]["x"]
@@ -237,21 +228,10 @@ class BehaviorAnalyzer:
         # Path efficiency ratio
         ratio = actual_length / straight_length
 
-        # Also check direction changes — humans change direction, bots don't
-        direction_changes = 0
-        for i in range(2, len(movements)):
-            dx1 = movements[i - 1]["x"] - movements[i - 2]["x"]
-            dy1 = movements[i - 1]["y"] - movements[i - 2]["y"]
-            dx2 = movements[i]["x"] - movements[i - 1]["x"]
-            dy2 = movements[i]["y"] - movements[i - 1]["y"]
-            # Cross product sign change = direction change
-            cross = dx1 * dy2 - dy1 * dx2
-            if i > 2:
-                prev_dx1 = movements[i - 2]["x"] - movements[i - 3]["x"]
-                prev_dy1 = movements[i - 2]["y"] - movements[i - 3]["y"]
-                prev_cross = prev_dx1 * dy1 - prev_dy1 * dx1
-                if cross * prev_cross < 0:
-                    direction_changes += 1
+        # Also check direction changes - humans curve left and right, bots don't.
+        # turn > 0 means the path bends one way, < 0 the other way; a sign flip = direction change.
+        turns = [self._turn(movements[i - 2], movements[i - 1], movements[i]) for i in range(2, len(movements))]
+        direction_changes = sum(1 for a, b in zip(turns, turns[1:]) if a * b < 0)
 
         dir_ratio = direction_changes / max(1, len(movements) - 2)
 
@@ -264,6 +244,13 @@ class BehaviorAnalyzer:
             return 0.85 + min(0.1, dir_ratio)  # Natural wobble — human
         else:
             return 0.7   # Very wobbly — still human (shaky hand)
+
+    @staticmethod
+    def _turn(p0, p1, p2) -> float:
+        """Cross product of the two steps p0->p1 and p1->p2: its sign says which way the path bends."""
+        dx1, dy1 = p1["x"] - p0["x"], p1["y"] - p0["y"]
+        dx2, dy2 = p2["x"] - p1["x"], p2["y"] - p1["y"]
+        return dx1 * dy2 - dy1 * dx2
 
     def _get_risk_level(self, behavior_score: float) -> str:
         """Higher behavior score = more human-like = lower risk."""
