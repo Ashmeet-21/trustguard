@@ -17,7 +17,7 @@ Multi-modal identity verification platform (portfolio project by Ashmeet Singh, 
 
 ## Commands (Windows, run from project root)
 ```
-venv\Scripts\python -m pytest tests/ -q        # 106 tests, ~35s (deepfake test loads ViT model)
+venv\Scripts\python -m pytest tests/ -q        # 112 tests, ~40s (deepfake test loads ViT model)
 venv\Scripts\python -m backend.main             # backend on :8000, docs at /docs
 cd frontend && npm run dev                      # frontend on :3000 (proxies /api → :8000)
 cd frontend && npm run build                    # verify frontend builds
@@ -72,7 +72,7 @@ docker-compose up --build                       # both services
 - Voice model `MattyB95/AST-ASVspoof2019...` is NOT served by any HF inference provider → voice always uses the local spectral fallback.
 - `datasets/test_images/test_face.jpg` has no detectable face (that is why it scored 0.148 on the old liveness checks); liveness was since replaced and benchmarked, see Honest gaps.
 - GitHub repo homepage + topics set; README has live links + real CI badge.
-- CI: `.github/workflows/ci.yml` triggers on `master`; green on every push since 2026-10-08 (105 tests then; 106 now).
+- CI: `.github/workflows/ci.yml` triggers on `master`; green on every push since 2026-10-08 (105 tests then; 112 now).
 
 ## Known gotchas
 - bcrypt must be pinned `4.1.3` (5.x breaks passlib).
@@ -107,7 +107,7 @@ docker-compose up --build                       # both services
 7. [ ] Optional: async routes block on ML (needs mediapipe lock), Redis for limiter/sessions, spoof dataset for liveness, validation set for threshold tuning.
 
 ## Liveness model swap (2026-11-13, branch liveness-weight-challenge = stacked on antispoof-model, NOT pushed)
-- Done: MiniFASNetV2 integrated (commit 1186882), weights 40/10/25/25 (liveness lowered after full-photo benchmark), landing + README copy, benchmark scripts/results, colour tokens, ServerWakeNotice (pings /health), typed speech API. 106 tests pass, frontend builds.
+- Done: MiniFASNetV2 integrated (commit 1186882), weights 40/10/25/25 (liveness lowered after full-photo benchmark), landing + README copy, benchmark scripts/results, colour tokens, ServerWakeNotice (pings /health), typed speech API. 112 tests pass, frontend builds.
 - Full-size check done (benchmarks/celeba_spoof_eval.py): AUC 0.80, see Honest gaps. Open decision: lower liveness weight (25% is high for a 63%-leak signal), pick a stricter threshold on a SEPARATE tuning set, or try another model / active challenge.
 - Before deploy (ask user): set Render env LIVENESS_THRESHOLD=0.12 or delete it (0.7 would reject ~31% of real faces). Then merge antispoof-model into master, push once.
 - Open: a no-face selfie is blocked on /verify with a retake message (fine); ResNet18 (CelebA-Spoof, non-commercial, test AUC 0.85) compared but not used.
@@ -123,6 +123,8 @@ docker-compose up --build                       # both services
 - Webcam results 2026-11-13 (logs in datasets/webcam_test/logs): front yaw -0.08..+0.14; left -0.15..-0.22 (negative = correct); right +0.13..+0.22; phone photo 1 of 9 shots passed (photo of an already-turned head + tilt). So a static photo CAN fake it if the attacker has a turned photo; copy must not oversell.
 - Thresholds now relative to the front photo: front |yaw| <= 0.15, change >= 0.10 (lowered from 0.15 on 2026-11-13: on saved webcam frames live pass 73% left / 58% right, photo-only attack 22% left / 0% right; same attack rate as at 0.15). Front photo is camera-only too.
 - HONEST GAP: nothing checks the turned face is the same person as the front photo, and a phone held up for the front shot still works. Copy: needs a live head turn; does not check same person; does not stop video replay. Real fix = face-embedding model (not decided). STILL TO DO: acceptance (a) 9/10 live tries, (b) tilted phone photo must not pass, (c) copy on landing/README: stops static photos, NOT a replayed video.
-- Tests: 111 pass (mock `head_yaw` in tests/test_session_orchestrator.py).
+- Tests: 112 pass (mock `head_yaw` in tests/test_session_orchestrator.py).
 - Pre-check (2026-11-13): `/detect/liveness` now also returns `checks.head_yaw`; /verify checks the turned photo with the same rule BEFORE Continue ("turn a bit more" + retake). Constants FRONT_MAX_YAW/TURN_MIN_YAW are duplicated in verify/page.tsx and session_orchestrator.py - keep equal. The 73%/58% numbers above are TUNING data (same frames used to pick 0.10); acceptance needs a fresh run with the threshold frozen.
 - Acceptance script (2026-11-13): `venv\Scripts\python -m benchmarks.headturn_test left|right|photo-left|photo-right` = 10 paired trials (front, then turned ~1.5 s later), scored with the SAME `head_turn_passes()` the server uses. Threshold FROZEN at 0.10: do not tune on its results. Not run yet. Copy (landing checks table + README) now states the limits. Not done: hash turn_image in replay gate; `/verify` never opened in a browser yet.
+- Simulated tilt attack (2026-11-13, `benchmarks/photo_tilt_attack.py`, results in `benchmarks/HEADTURN_TILT_RESULTS.md`): warped straight photo passed 21/576 (3.6%), 36 front photos. Simulation only; live webcam acceptance still NOT run.
+- Browser /verify run (2026-11-13, photo step only, backend log): too few clean tries to give a rate. 3 sessions, all asked left. Front shots -0.178, -0.215, -0.156, +0.177 were over the 0.15 front limit (page asks for a retake); 1 clean pass (front +0.096 -> turn -0.299). Front limit 0.15 may feel strict; do NOT tune on this. Log lines: `Session created ... asked=`, `Liveness ... yaw=` (not labelled front/turn).

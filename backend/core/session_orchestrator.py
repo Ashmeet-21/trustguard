@@ -96,7 +96,7 @@ class SessionOrchestrator:
                 "agents": {},
                 "result": None,
             }
-            logger.info("Session created: {}", session_id)
+            logger.info("Session created: {} asked={}", session_id, self.sessions[session_id]["challenge"])
             return session_id
 
     def run_session(self, session_id: str, image_path=None, audio_path=None, behavior_data=None, turn_image_path=None) -> dict:
@@ -146,6 +146,7 @@ class SessionOrchestrator:
                 risk_level = lv_result["risk_level"]
                 # Active challenge: a failed head turn makes liveness CRITICAL (a static photo can't turn)
                 lv_result["head_turn"] = self._check_head_turn(session, image_path, turn_image_path)
+                logger.info("HEADTURN {}", lv_result["head_turn"])
                 if not lv_result["head_turn"]["passed"]:
                     lv_score, risk_level = 0, "CRITICAL"
                 signals["video_agent"] = {

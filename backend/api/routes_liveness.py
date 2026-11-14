@@ -53,7 +53,7 @@ async def detect_liveness_image(
     db.add(log)
     db.commit()
 
-    logger.info("Liveness: {} (score={:.4f})", result["classification"], result["liveness_score"])
+    logger.info("Liveness: {} (score={:.4f}) yaw={}", result["classification"], result["liveness_score"], result.get("checks", {}).get("head_yaw"))
     return result
 
 

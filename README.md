@@ -234,7 +234,7 @@ Runs both backend (port 8000) and frontend (port 3000).
 ## Running Tests
 
 ```bash
-# All 106 tests
+# All 112 tests
 pytest tests/ -v
 
 # By module
@@ -355,7 +355,7 @@ trustguard/
 │   │       └── Providers.tsx          # Client-side provider wrapper
 │   ├── next.config.ts                # API proxy rewrites
 │   └── package.json
-├── tests/                            # 106 tests (17 test files)
+├── tests/                            # 112 tests (17 test files)
 ├── Dockerfile                        # Backend container
 ├── docker-compose.yml                # Full-stack orchestration
 ├── requirements.txt                  # Python dependencies
@@ -378,8 +378,27 @@ trustguard/
 | Auth | python-jose + passlib | JWT tokens, bcrypt password hashing |
 | Database | SQLAlchemy + SQLite | Zero setup, swappable to PostgreSQL |
 | Rate Limiting | slowapi | Per-IP request throttling |
-| Testing | pytest | 106 tests covering detectors, API, orchestration, security |
+| Testing | pytest | 112 tests covering detectors, API, orchestration, security |
 | Logging | Loguru | Structured logging with rotation |
+
+---
+
+## Limitations & Next Steps
+
+This is a portfolio project, not a production identity product. Here is what was measured, what is still weak, and what I would do next.
+
+| Area | What I measured / know | Next step |
+|------|------------------------|-----------|
+| Deepfake image check | 65% of fakes caught, 0% of real faces flagged (199 images, AUC 0.87). Strong on text-to-image fakes, weak on face swaps (6%). | Larger, more varied test set; a model that handles face swaps |
+| Liveness check | AUC 0.80 on full-size photos; about 63% of spoof attacks still pass. Weight cut from 25% to 10% because of this. A replayed video can still fool it. | Stricter threshold chosen on a separate tuning set; test other anti-spoof models |
+| Head-turn challenge | In a simulation (tilted photos, 576 tries) 3.6% got through; not yet measured with live users. Does not check that the turned face is the same person, and a photo of an already-turned head can pass. | Add a face-embedding model to compare the two photos |
+| Voice check | Not validated against any spoof dataset. The hosted model is not served by any provider, so the local spectral fallback runs. | Benchmark on ASVspoof; pick a model I can run locally |
+| Typing / mouse check | Rule-based with hand-set thresholds, not validated on real users. | Collect labelled data and tune |
+| Risk weights | Set by hand (40 / 10 / 25 / 25). | Tune on labelled data |
+| Scale | Sessions, rate limits and replay hashes are in memory, so they reset on restart and do not work across several workers. Routes block while ML runs. | Redis for shared state; thread-safe face detection so routes can run in parallel |
+| Access control | Any logged-in user can see platform-wide analytics. | Admin role |
+
+Numbers come from the scripts in `benchmarks/`. I did not tune thresholds on the test sets.
 
 ---
 
