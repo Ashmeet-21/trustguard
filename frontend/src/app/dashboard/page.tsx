@@ -132,16 +132,14 @@ export default function DashboardPage() {
         <>
           {/* Summary strip */}
           <dl className="mt-10 grid grid-cols-2 lg:grid-cols-4 border-y-2 border-ink">
+            {/* 2 columns on small screens, 4 on large: `borders` draws the lines between boxes */}
             {[
-              { label: "Checks run", value: total.toLocaleString() },
-              { label: "Flagged as fake or bot", value: `${summary.deepfakes_caught.toLocaleString()}`, sub: `${pctOf(summary.deepfakes_caught)}% of all checks` },
-              { label: "Came back clean", value: summary.clean_results.toLocaleString(), sub: `${pctOf(summary.clean_results)}% of all checks` },
-              { label: "Average processing time", value: formatDuration(summary.avg_processing_time_ms) },
-            ].map((s, i) => (
-              <div
-                key={s.label}
-                className={`py-5 pr-4 ${i % 2 === 1 ? "pl-5 border-l border-rule" : ""} ${i === 2 ? "lg:pl-5 lg:border-l border-t lg:border-t-0 border-rule" : ""} ${i === 3 ? "border-t lg:border-t-0" : ""}`}
-              >
+              { label: "Checks run", value: total.toLocaleString(), borders: "" },
+              { label: "Flagged as fake or bot", value: summary.deepfakes_caught.toLocaleString(), sub: `${pctOf(summary.deepfakes_caught)}% of all checks`, borders: "pl-5 border-l border-rule" },
+              { label: "Came back clean", value: summary.clean_results.toLocaleString(), sub: `${pctOf(summary.clean_results)}% of all checks`, borders: "lg:pl-5 lg:border-l border-t lg:border-t-0 border-rule" },
+              { label: "Average processing time", value: formatDuration(summary.avg_processing_time_ms), borders: "pl-5 border-l border-rule border-t lg:border-t-0" },
+            ].map((s) => (
+              <div key={s.label} className={`py-5 pr-4 ${s.borders}`}>
                 <dt className="text-sm text-ink-soft">{s.label}</dt>
                 <dd className="mt-1 text-3xl font-bold leading-tight text-ink figures">{s.value}</dd>
                 {s.sub && <dd className="text-sm text-ink-faint figures">{s.sub}</dd>}
