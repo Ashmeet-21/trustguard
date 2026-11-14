@@ -11,10 +11,7 @@ import BehavioralTracker from "@/components/BehavioralTracker";
 import VerificationDocument from "@/components/VerificationDocument";
 import { createSession, runVerification, checkFace, type SessionResult } from "@/lib/api";
 import type { BehaviorData } from "@/components/BehavioralTracker";
-
-// Head-turn limits: keep equal to FRONT_MAX_YAW / TURN_MIN_YAW in backend/core/session_orchestrator.py
-const FRONT_MAX_YAW = 0.15;
-const TURN_MIN_YAW = 0.10;
+import { frontPhotoProblem, headTurnProblem } from "@/lib/faceRules";
 
 /** Plain-English quality gate results */
 function gateInfo(gate: string, passed: boolean): { title: string; description: string } {
@@ -121,33 +118,10 @@ export default function VerifyPage() {
     try {
       const check = await checkFace(file);
       setFrontYaw(check.headYaw);
-      if (!check.faceDetected) {
-        setFaceError("No face found. Take a clear selfie with your whole face inside the oval.");
+      const problem = frontPhotoProblem(check);
+      if (problem) {
+        setFaceError(problem);
         setImageFile(null);
-      } else if (check.faceBbox) {
-        const bbox = check.faceBbox;
-        const EDGE = 0.04;
-        const cutSides: string[] = [];
-        if (bbox.x_min < EDGE) cutSides.push("left");
-        if (bbox.y_min < EDGE) cutSides.push("top");
-        if (bbox.x_max > 1 - EDGE) cutSides.push("right");
-        if (bbox.y_max > 1 - EDGE) cutSides.push("bottom");
-
-        if (cutSides.length > 0) {
-          setFaceError(`Your face is cut off at the ${cutSides.join(" and ")}. Centre your whole face inside the oval.`);
-          setImageFile(null);
-        } else if (bbox.width_pct < 0.15 || bbox.height_pct < 0.18) {
-          setFaceError("Your face is too small in the photo. Move closer so it fills the oval.");
-          setImageFile(null);
-        } else if (check.livenessScore < 0.3) {
-          setFaceError("The photo looks blurry or taken from a screen. Take a sharp, well-lit selfie directly with your camera.");
-          setImageFile(null);
-        } else if (check.livenessScore < 0.5) {
-          setFaceError("The photo is unclear. Find better light and hold the camera steady.");
-          setImageFile(null);
-        } else {
-          setFaceValid(true);
-        }
       } else {
         setFaceValid(true);
       }
@@ -158,23 +132,15 @@ export default function VerifyPage() {
     }
   };
 
-  // Same rule as the server (session_orchestrator.py), so people can retake BEFORE the one-shot verification
   const handleTurnCapture = async (file: File) => {
     setTurnFile(null);
     setTurnError(null);
     setTurnChecking(true);
     try {
       const check = await checkFace(file);
-      if (!session || !check.faceDetected || check.headYaw === null) {
-        setTurnError("No face found in the second photo. Keep your face in view and try again.");
-      } else if (frontYaw === null || Math.abs(frontYaw) > FRONT_MAX_YAW) {
-        setTurnError("Your first photo was not straight. Take a different first photo, looking at the camera.");
-      } else {
-        const change = check.headYaw - frontYaw;
-        const turnedEnough = session.challenge === "left" ? change <= -TURN_MIN_YAW : change >= TURN_MIN_YAW;
-        if (turnedEnough) setTurnFile(file);
-        else setTurnError(`Turn a bit more towards your ${session.challenge} shoulder, then take the photo again.`);
-      }
+      const problem = headTurnProblem(check, frontYaw, session?.challenge ?? null);
+      if (problem) setTurnError(problem);
+      else setTurnFile(file);
     } catch {
       setTurnError("Couldn’t check the photo right now. Wait a few seconds and take it again.");
     } finally {
