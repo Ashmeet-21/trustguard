@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useCallback } from "react";
+import { MIN_RECORDING_SECONDS, checkRecording, encodeWAV } from "@/lib/audio";
 
 interface Props {
   onRecording: (blob: Blob) => void;
@@ -18,100 +19,12 @@ const PHRASES = [
   "Protecting data requires constant vigilance and care",
 ];
 
-const MIN_RECORDING_SECONDS = 3;
-const SILENCE_THRESHOLD = 0.01;
-const MIN_WORD_MATCH = 40; // At least 40% of words must match
-
 function pickRandom(exclude?: number): number {
   let idx: number;
   do {
     idx = Math.floor(Math.random() * PHRASES.length);
   } while (idx === exclude && PHRASES.length > 1);
   return idx;
-}
-
-/**
- * Encode raw PCM float samples into a WAV file blob.
- */
-function encodeWAV(samples: Float32Array[], sampleRate: number): Blob {
-  const totalLength = samples.reduce((acc, s) => acc + s.length, 0);
-  const buffer = new ArrayBuffer(44 + totalLength * 2);
-  const view = new DataView(buffer);
-
-  function writeStr(offset: number, str: string) {
-    for (let i = 0; i < str.length; i++) {
-      view.setUint8(offset + i, str.charCodeAt(i));
-    }
-  }
-
-  writeStr(0, "RIFF");
-  view.setUint32(4, 36 + totalLength * 2, true);
-  writeStr(8, "WAVE");
-  writeStr(12, "fmt ");
-  view.setUint32(16, 16, true);
-  view.setUint16(20, 1, true);
-  view.setUint16(22, 1, true);
-  view.setUint32(24, sampleRate, true);
-  view.setUint32(28, sampleRate * 2, true);
-  view.setUint16(32, 2, true);
-  view.setUint16(34, 16, true);
-  writeStr(36, "data");
-  view.setUint32(40, totalLength * 2, true);
-
-  let offset = 44;
-  for (const chunk of samples) {
-    for (let i = 0; i < chunk.length; i++) {
-      const s = Math.max(-1, Math.min(1, chunk[i]));
-      view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true);
-      offset += 2;
-    }
-  }
-
-  return new Blob([buffer], { type: "audio/wav" });
-}
-
-/** Calculate RMS (loudness) of audio chunks — 0 means silence */
-function calculateRMS(chunks: Float32Array[]): number {
-  let sumSquares = 0;
-  let count = 0;
-  for (const chunk of chunks) {
-    for (let i = 0; i < chunk.length; i++) {
-      sumSquares += chunk[i] * chunk[i];
-      count++;
-    }
-  }
-  return count > 0 ? Math.sqrt(sumSquares / count) : 0;
-}
-
-/**
- * Detect audio clipping/crackling — samples hitting max amplitude.
- * Returns the fraction of samples that are clipped (>= 0.99 amplitude).
- * Above ~2% clipping = crackling/distorted audio.
- */
-function detectClipping(chunks: Float32Array[]): number {
-  let clipped = 0;
-  let total = 0;
-  for (const chunk of chunks) {
-    for (let i = 0; i < chunk.length; i++) {
-      total++;
-      if (Math.abs(chunk[i]) >= 0.99) clipped++;
-    }
-  }
-  return total > 0 ? clipped / total : 0;
-}
-
-/** Compare spoken transcript words against target phrase words */
-function wordMatch(spoken: string, target: string): number {
-  const spokenWords = spoken.toLowerCase().trim().split(/\s+/).filter(Boolean);
-  const targetWords = target.toLowerCase().trim().split(/\s+/).filter(Boolean);
-  if (targetWords.length === 0) return 0;
-  let matched = 0;
-  for (const tw of targetWords) {
-    if (spokenWords.some((sw) => sw === tw || sw.includes(tw) || tw.includes(sw))) {
-      matched++;
-    }
-  }
-  return Math.round((matched / targetWords.length) * 100);
 }
 
 // The Web Speech API is not in TypeScript's built-in types, so we describe
@@ -254,74 +167,14 @@ export default function AudioRecorder({ onRecording, onReset }: Props) {
       recognitionRef.current = null;
     }
 
-    // Validate minimum duration
-    const currentTimer = chunksRef.current.length > 0
-      ? Math.floor((chunksRef.current.reduce((acc, c) => acc + c.length, 0) / sampleRate))
-      : 0;
-
-    if (currentTimer < MIN_RECORDING_SECONDS) {
-      setError(
-        `Recording too short (${currentTimer}s). Please record at least ${MIN_RECORDING_SECONDS} seconds of speech.`
-      );
+    // Check length, loudness, distortion and (if available) the spoken words
+    const transcript = speechAvailableRef.current ? transcriptRef.current : null;
+    const result = checkRecording(chunksRef.current, sampleRate, transcript, phrase);
+    if ("error" in result) {
+      setError(result.error);
       return;
     }
-
-    // Check for silence
-    const rms = calculateRMS(chunksRef.current);
-    if (rms < SILENCE_THRESHOLD) {
-      setError(
-        "No speech detected — the recording was silent. Please speak clearly into your microphone and try again."
-      );
-      return;
-    }
-
-    // Check for clipping/crackling — distorted audio gives bad results
-    const clipRatio = detectClipping(chunksRef.current);
-    if (clipRatio > 0.05) {
-      setError(
-        "Audio is crackling or distorted — your microphone input is too loud. Please move further from the mic or lower your input volume, then try again."
-      );
-      return;
-    }
-
-    // Speech content validation (if Web Speech API was available)
-    if (speechAvailableRef.current) {
-      const transcript = transcriptRef.current.trim();
-      if (transcript.length === 0) {
-        setError(
-          "Could not recognize any speech. Please speak clearly and read the exact phrase displayed above."
-        );
-        return;
-      }
-
-      const match = wordMatch(transcript, phrase);
-      if (match < MIN_WORD_MATCH) {
-        setError(
-          `Speech didn't match the phrase (${match}% match, need ${MIN_WORD_MATCH}%). Please read the exact phrase shown above.`
-        );
-        return;
-      }
-
-      // Low match warning (still accept)
-      if (match < 70) {
-        setWarning(
-          `Partial match detected (${match}%). Recording accepted, but reading the exact phrase improves accuracy.`
-        );
-      }
-    }
-
-    // Crackling warning for borderline (2-5% clipping) — still accept
-    let newWarning: string | null = null;
-    if (clipRatio > 0.02) {
-      newWarning = "Slight audio distortion detected. Recording accepted, but speaking at a normal volume gives better results.";
-    }
-
-    // Low volume warning (still accept)
-    if (rms < SILENCE_THRESHOLD * 3 && !newWarning) {
-      newWarning = "Low audio level detected. The recording was accepted but speaking louder may improve results.";
-    }
-
-    if (newWarning) setWarning(newWarning);
+    if (result.warning) setWarning(result.warning);
 
     const wavBlob = encodeWAV(chunksRef.current, sampleRate);
     // Create playback URL
