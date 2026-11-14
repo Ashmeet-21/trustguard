@@ -125,68 +125,15 @@ class SessionOrchestrator:
         start = time.time()
         signals = {}
 
-        # Run image agents (deepfake + liveness)
+        # Run each agent that has input. _safe_signal turns a crash into an error signal (fail closed).
         if image_path and self.deepfake_detector:
-            try:
-                df_result = self.deepfake_detector.predict_image(image_path)
-                df_score = round((1 - df_result["probabilities"]["fake"]) * 100, 1)
-                signals["image_agent"] = {
-                    "score": df_score,
-                    "risk_level": df_result["risk_level"],
-                    "details": df_result,
-                }
-            except Exception as e:
-                logger.error("Image agent failed: {}", e)
-                signals["image_agent"] = {"score": 0, "risk_level": "HIGH", "error": "Processing failed"}
-
+            signals["image_agent"] = self._safe_signal("Image agent", self._image_signal, image_path)
         if image_path and self.liveness_detector:
-            try:
-                lv_result = self.liveness_detector.detect_liveness(image_path)
-                lv_score = round(lv_result["liveness_score"] * 100, 1)
-                risk_level = lv_result["risk_level"]
-                # Active challenge: a failed head turn makes liveness CRITICAL (a static photo can't turn)
-                lv_result["head_turn"] = self._check_head_turn(session, image_path, turn_image_path)
-                logger.info("HEADTURN {}", lv_result["head_turn"])
-                if not lv_result["head_turn"]["passed"]:
-                    lv_score, risk_level = 0, "CRITICAL"
-                signals["video_agent"] = {
-                    "score": lv_score,
-                    "risk_level": risk_level,
-                    "details": lv_result,
-                }
-            except Exception as e:
-                logger.error("Liveness agent failed: {}", e)
-                signals["video_agent"] = {"score": 0, "risk_level": "HIGH", "error": "Processing failed"}
-
-        # Run voice agent
+            signals["video_agent"] = self._safe_signal("Liveness agent", self._liveness_signal, session, image_path, turn_image_path)
         if audio_path and self.voice_detector:
-            try:
-                voice_result = self.voice_detector.detect_voice(audio_path)
-                if voice_result.get("model_used") == "error":  # detector couldn't analyze the audio
-                    raise ValueError("voice analysis failed")
-                voice_score = round(voice_result["human_score"] * 100, 1)
-                signals["voice_agent"] = {
-                    "score": voice_score,
-                    "risk_level": voice_result["risk_level"],
-                    "details": voice_result,
-                }
-            except Exception as e:
-                logger.error("Voice agent failed: {}", e)
-                signals["voice_agent"] = {"score": 0, "risk_level": "HIGH", "error": "Processing failed"}
-
-        # Run behavior agent
+            signals["voice_agent"] = self._safe_signal("Voice agent", self._voice_signal, audio_path)
         if behavior_data and self.behavior_analyzer:
-            try:
-                beh_result = self.behavior_analyzer.analyze(behavior_data)
-                beh_score = round(beh_result["behavior_score"] * 100, 1)
-                signals["behavior_agent"] = {
-                    "score": beh_score,
-                    "risk_level": beh_result["risk_level"],
-                    "details": beh_result,
-                }
-            except Exception as e:
-                logger.error("Behavior agent failed: {}", e)
-                signals["behavior_agent"] = {"score": 0, "risk_level": "HIGH", "error": "Processing failed"}
+            signals["behavior_agent"] = self._safe_signal("Behavior agent", self._behavior_signal, behavior_data)
 
         # Calculate risk (only pass non-error signals to risk engine)
         clean_signals = {k: v for k, v in signals.items() if "error" not in v}
@@ -218,6 +165,45 @@ class SessionOrchestrator:
 
         logger.info("Session {}: {} (trust_score={})", session_id, risk_result["decision"], risk_result["trust_score"])
         return session_result
+
+    # ---- One small function per agent. Each returns (score 0-100, risk_level, details). ----
+
+    def _safe_signal(self, agent_label, agent_function, *args) -> dict:
+        """Run one agent. If it crashes, return an error signal instead of crashing the whole session."""
+        try:
+            score, risk_level, details = agent_function(*args)
+            return {"score": score, "risk_level": risk_level, "details": details}
+        except Exception as e:
+            logger.error("{} failed: {}", agent_label, e)
+            return {"score": 0, "risk_level": "HIGH", "error": "Processing failed"}
+
+    def _image_signal(self, image_path):
+        """Deepfake check: score = chance the image is real."""
+        result = self.deepfake_detector.predict_image(image_path)
+        return round((1 - result["probabilities"]["fake"]) * 100, 1), result["risk_level"], result
+
+    def _liveness_signal(self, session, image_path, turn_image_path):
+        """Liveness check plus the head-turn challenge. A failed head turn makes liveness CRITICAL."""
+        result = self.liveness_detector.detect_liveness(image_path)
+        score = round(result["liveness_score"] * 100, 1)
+        risk_level = result["risk_level"]
+        result["head_turn"] = self._check_head_turn(session, image_path, turn_image_path)
+        logger.info("HEADTURN {}", result["head_turn"])
+        if not result["head_turn"]["passed"]:  # a static photo can't turn its head
+            score, risk_level = 0, "CRITICAL"
+        return score, risk_level, result
+
+    def _voice_signal(self, audio_path):
+        """Voice check: score = chance the voice is human."""
+        result = self.voice_detector.detect_voice(audio_path)
+        if result.get("model_used") == "error":  # detector couldn't analyze the audio
+            raise ValueError("voice analysis failed")
+        return round(result["human_score"] * 100, 1), result["risk_level"], result
+
+    def _behavior_signal(self, behavior_data):
+        """Typing + mouse check: score = how human the behavior looks."""
+        result = self.behavior_analyzer.analyze(behavior_data)
+        return round(result["behavior_score"] * 100, 1), result["risk_level"], result
 
     def _check_head_turn(self, session: dict, front_path, turn_path) -> dict:
         """Did the user turn their head the way THIS session asked? Fails closed on anything missing."""
